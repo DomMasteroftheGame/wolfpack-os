@@ -1,0 +1,37 @@
+Business Source License 1.1
+
+Licensor:                  Dominique Harris (PICD Group)
+Licensed Work:             Wolfpack OS, including the source code in this
+                           repository, version 0.1.0 and later versions
+                           released under this license.
+Additional Use Grant:      You may use, copy, modify, and distribute the
+                           Licensed Work for any internal business or personal
+                           purpose, including providing it to your own
+                           employees and contractors for your internal use.
+Change Date:               The fourth anniversary of the release date of
+                           each version of the Licensed Work.
+Change License:            Apache License, Version 2.0
+
+-----------------------------------------------------------------------------
+
+The Licensor grants you the rights above under the Business Source License
+("BSL"). The Licensed Work is not "Open Source" until the Change Date. On
+the Change Date for each version, that version of the Licensed Work becomes
+available under the Change License.
+
+You may not use the Licensed Work to offer a hosted or managed service that
+competes with the Licensor's own offerings of the Licensed Work, including
+any service that provides substantially the same functionality as the
+Licensed Work to third parties as a hosted or managed service.
+
+All use of the Licensed Work other than as permitted above requires a
+separate commercial license from the Licensor. Enterprise support, managed
+hosting, guided onboarding, and custom builds are available from the
+Licensor — see ENTERPRISE.md.
+
+THE LICENSED WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE LICENSED WORK OR THE USE OR OTHER DEALINGS IN THE LICENSED WORK.

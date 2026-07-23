@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WolfPack OS</title>
+<style>
+:root {
+  --bg: #030712;
+  --panel: rgba(9, 17, 32, 0.88);
+  --panel-solid: #0b1424;
+  --text: #e0f2fe;
+  --muted: #7dd3fc;
+  --dim: rgba(125, 211, 252, 0.55);
+  --accent: #00f0ff;
+  --accent-2: #0ea5e9;
+  --success: #00ff9d;
+  --error: #ff3860;
+  --warn: #facc15;
+  --border: rgba(0, 240, 255, 0.18);
+  --glow: rgba(0, 240, 255, 0.35);
+  --taskbar-h: 52px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  user-select: none;
+}
+/* ---------- background ---------- */
+.bg-grid {
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,240,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,240,255,0.05) 1px, transparent 1px);
+  background-size: 45px 45px;
+  animation: gridMove 14s linear infinite;
+  pointer-events: none;
+}
+.bg-grid::before {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 50% 10%, rgba(0,240,255,0.10), transparent 55%),
+    radial-gradient(circle at 85% 90%, rgba(14,165,233,0.08), transparent 45%);
+}
+@keyframes gridMove { to { background-position: 0 45px; } }
+/* ---------- boot splash ---------- */
+#boot {
+  position: fixed; inset: 0; z-index: 10000;
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.6rem; transition: opacity 0.6s ease;
+}
+#boot .boot-logo {
+  font-size: 3rem; font-weight: 800; letter-spacing: 0.3em;
+  color: var(--accent); text-shadow: 0 0 30px var(--glow);
+  animation: bootPulse 1.4s ease infinite;
+}
+#boot .boot-logo span { color: var(--text); font-weight: 300; }
+@keyframes bootPulse { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
+#boot .boot-bar {
+  width: 280px; height: 4px; border-radius: 2px;
+  background: rgba(0,240,255,0.12); overflow: hidden;
+}
+#boot .boot-bar div {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  box-shadow: 0 0 12px var(--glow);
+  transition: width 0.25s ease;
+}
+#boot .boot-msg { font-size: 0.75rem; letter-spacing: 0.2em; color: var(--dim); text-transform: uppercase; min-height: 1em; }
+/* ---------- desktop icons ---------- */
+#desktop {
+  position: fixed; inset: 0 0 var(--taskbar-h) 0; z-index: 1;
+  padding: 1.4rem;
+  display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start;
+  gap: 0.6rem;
+}
+.icon {
+  width: 92px; padding: 0.7rem 0.3rem; border-radius: 0.7rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.icon:hover { background: rgba(0,240,255,0.07); border-color: var(--border); }
+.icon .glyph {
+  width: 46px; height: 46px; border-radius: 0.7rem;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.45rem;
+  background: var(--panel); border: 1px solid var(--border);
+  box-shadow: 0 0 14px rgba(0,240,255,0.12), inset 0 0 12px rgba(0,240,255,0.06);
+}
+.icon .label { font-size: 0.68rem; letter-spacing: 0.06em; color: var(--muted); text-align: center; }
+/* ---------- windows ---------- */
+.window {
+  position: absolute; z-index: 100;
+  min-width: 340px; min-height: 220px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 10px 45px rgba(0,0,0,0.55), 0 0 25px rgba(0,240,255,0.08);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.window.focused { border-color: rgba(0,240,255,0.45); box-shadow: 0 10px 45px rgba(0,0,0,0.6), 0 0 35px rgba(0,240,255,0.16); }
+.window.maximized { border-radius: 0; }
+.titlebar {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  background: rgba(0,240,255,0.05);
+  border-bottom: 1px solid var(--border);
+  cursor: grab; flex-shrink: 0;
+}
+.titlebar:active { cursor: grabbing; }
+.titlebar .t-glyph { font-size: 0.95rem; }
+.titlebar .t-title {
+  flex: 1; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.titlebar .t-btns { display: flex; gap: 0.4rem; }
+.t-btn {
+  width: 22px; height: 22px; border-radius: 0.35rem;
+  border: 1px solid var(--border); background: rgba(0,240,255,0.06);
+  color: var(--muted); font-size: 0.7rem; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s ease; padding: 0;
+}
+.t-btn:hover { background: rgba(0,240,255,0.18); color: var(--accent); }
+.t-btn.close:hover { background: rgba(255,56,96,0.25); border-color: var(--error); color: var(--error); }
+.win-body { flex: 1; overflow: auto; padding: 0.9rem; font-size: 0.85rem; user-select: text; }
+.win-body::-webkit-scrollbar { width: 7px; height: 7px; }
+.win-body::-webkit-scrollbar-track { background: rgba(0,240,255,0.04); }
+.win-body::-webkit-scrollbar-thumb { background: var(--accent-2); border-radius: 4px; }
+.resizer {
+  position: absolute; right: 0; bottom: 0; width: 16px; height: 16px;
+  cursor: nwse-resize; z-index: 5;
+  background: linear-gradient(135deg, transparent 50%, rgba(0,240,255,0.35) 50%);
+  border-bottom-right-radius: 0.8rem;
+}
+/* ---------- taskbar ---------- */
+#taskbar {
+  position: fixed; left: 0; right: 0; bottom: 0; height: var(--taskbar-h); z-index: 9000;
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0 0.7rem;
+  background: rgba(5, 10, 22, 0.92);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(18px);
+}
+#startBtn {
+  height: 36px; padding: 0 0.95rem; border-radius: 0.55rem;
+  border: 1px solid var(--border);
+  background: linear-gradient(90deg, rgba(14,165,233,0.25), rgba(0,240,255,0.2));
+  color: var(--accent); font-weight: 800; letter-spacing: 0.18em; font-size: 0.78rem;
+  cursor: pointer; text-shadow: 0 0 10px var(--glow);
+}
+#startBtn:hover { box-shadow: 0 0 18px var(--glow); }
+#taskItems { flex: 1; display: flex; gap: 0.4rem; overflow-x: auto; }
+.task-item {
+  height: 36px; padding: 0 0.8rem; border-radius: 0.55rem;
+  display: flex; align-items: center; gap: 0.45rem;
+  border: 1px solid var(--border); background: rgba(0,240,255,0.05);
+  color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s ease;
+}
+.task-item:hover, .task-item.active { background: rgba(0,240,255,0.16); color: var(--accent); }
+.task-item.minimized { opacity: 0.55; }
+#tray { display: flex; align-items: center; gap: 0.9rem; font-size: 0.72rem; color: var(--muted); }
+#trayStatus { display: flex; align-items: center; gap: 0.4rem; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.dot.busy { background: var(--warn); box-shadow: 0 0 8px var(--warn); animation: blink 0.8s infinite; }
+@keyframes blink { 50% { opacity: 0.35; } }
+#clock { font-family: ui-monospace, monospace; color: var(--accent); letter-spacing: 0.08em; }
+/* ---------- start menu ---------- */
+#startMenu {
+  position: fixed; left: 0.7rem; bottom: calc(var(--taskbar-h) + 8px); z-index: 9500;
+  width: 260px; padding: 0.6rem;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 0.8rem;
+  backdrop-filter: blur(18px); box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+  display: none;
+}
+#startMenu.open { display: block; animation: menuUp 0.18s ease; }
+@keyframes menuUp { from { opacity: 0; transform: translateY(10px); } }
+.menu-item {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.55rem 0.7rem; border-radius: 0.55rem; cursor: pointer;
+  color: var(--text); font-size: 0.82rem;
+}
+.menu-item:hover { background: rgba(0,240,255,0.12); }
+.menu-item .glyph { font-size: 1.05rem; width: 24px; text-align: center; }
+.menu-sep { height: 1px; background: var(--border); margin: 0.45rem 0.3rem; }
+/* ---------- shared widgets ---------- */
+button.btn {
+  padding: 0.5rem 1.1rem; border: none; border-radius: 0.5rem;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  color: #001018; font-weight: 800; font-size: 0.78rem; letter-spacing: 0.06em;
+  cursor: pointer; box-shadow: 0 0 14px rgba(0,240,255,0.25);
+}
+button.btn:hover { box-shadow: 0 0 22px var(--glow); }
+button.btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+button.btn.ghost {
+  background: rgba(0,240,255,0.07); color: var(--accent);
+  border: 1px solid var(--border); box-shadow: none; font-weight: 600;
+}
+button.btn.ghost:hover { background: rgba(0,240,255,0.15); }
+button.btn.ghost.off { color: var(--muted); border-color: var(--border); opacity: 0.7; }
+/* ---------- wifi picker ---------- */
+#wifiMenu {
+  position: fixed; right: 0.7rem; bottom: calc(var(--taskbar-h) + 8px); z-index: 9500;
+  width: 300px; max-height: 62vh; padding: 0.6rem;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 0.8rem;
+  backdrop-filter: blur(18px); box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+  display: none; flex-direction: column; gap: 0.4rem;
+}
+#wifiMenu.open { display: flex; animation: menuUp 0.18s ease; }
+.wifi-head { display:flex; align-items:center; justify-content:space-between; padding:0.2rem 0.3rem 0.45rem; border-bottom:1px solid var(--border); color:var(--accent); font-weight:800; letter-spacing:0.16em; font-size:0.76rem; }
+#wifiList { overflow-y:auto; display:flex; flex-direction:column; gap:0.15rem; max-height:44vh; }
+.wifi-net { display:flex; align-items:center; gap:0.55rem; padding:0.45rem 0.5rem; border-radius:0.5rem; cursor:pointer; font-size:0.78rem; color:var(--text); }
+.wifi-net:hover { background: rgba(0,240,255,0.12); }
+.wifi-net.active { background: rgba(0,240,255,0.18); color:var(--accent); }
+.wifi-net .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wifi-net .sig { font-family:ui-monospace,monospace; color:var(--accent); font-size:0.72rem; letter-spacing:-1px; }
+.wifi-net .lock { color:var(--muted); font-size:0.72rem; }
+.wifi-msg { padding:0.5rem; color:var(--muted); font-size:0.75rem; text-align:center; }
+.wifi-pw { display:flex; gap:0.35rem; padding:0.35rem 0.3rem; }
+.wifi-pw input { flex:1; }
+.wifi-pw .btn { padding:0.35rem 0.7rem; }
+.wifi-foot { display:flex; align-items:center; justify-content:space-between; gap:0.4rem; padding-top:0.35rem; border-top:1px solid var(--border); font-size:0.68rem; color:var(--muted); }
+.wifi-foot .btn { padding:0.3rem 0.6rem; }
+.wifi-switch { position:relative; display:inline-block; width:38px; height:20px; }
+.wifi-switch input { opacity:0; width:0; height:0; }
+.wifi-slider { position:absolute; inset:0; background:rgba(255,255,255,0.15); border-radius:20px; transition:0.2s; cursor:pointer; }
+.wifi-slider:before { content:""; position:absolute; height:14px; width:14px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:0.2s; }
+.wifi-switch input:checked + .wifi-slider { background:var(--accent); box-shadow:0 0 10px var(--glow); }
+.wifi-switch input:checked + .wifi-slider:before { transform:translateX(18px); }
+input[type=text], input[type=password], input[type=number], textarea, select {
+  width: 100%; padding: 0.5rem 0.65rem;
+  background: rgba(3,7,18,0.75); border: 1px solid var(--border); border-radius: 0.5rem;
+  color: var(--text); font-family: inherit; font-size: 0.83rem; outline: none;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 12px rgba(0,240,255,0.18); }
+textarea { resize: vertical; }
+label.field { display: block; margin-bottom: 0.7rem; }
+label.field .fname { display: block; font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin-bottom: 0.3rem; }
+.check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; margin-bottom: 0.55rem; cursor: pointer; }
+.check input { width: auto; }
+.section-h {
+  font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 700;
+  color: var(--accent); margin: 1rem 0 0.6rem;
+  display: flex; align-items: center; gap: 0.6rem;
+}
+.section-h::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--accent), transparent); }
+.section-h:first-child { margin-top: 0; }
+.card {
+  background: rgba(3,7,18,0.55); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: 0.6rem; padding: 0.75rem 0.9rem; margin-bottom: 0.65rem;
+}
+.card h4 { margin: 0 0 0.35rem; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.card pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 0.8rem; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+.card.success { border-left-color: var(--success); } .card.success h4 { color: var(--success); }
+.card.error { border-left-color: var(--error); } .card.error h4 { color: var(--error); }
+.empty { color: var(--dim); font-style: italic; padding: 0.4rem 0.1rem; }
+.bar-row { margin-bottom: 0.85rem; }
+.bar-row .bar-label { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); margin-bottom: 0.3rem; letter-spacing: 0.08em; }
+.bar { height: 10px; border-radius: 5px; background: rgba(0,240,255,0.08); overflow: hidden; border: 1px solid var(--border); }
+.bar div { height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); box-shadow: 0 0 10px var(--glow); transition: width 0.5s ease; border-radius: 5px; }
+.bar.hot div { background: linear-gradient(90deg, #f97316, var(--error)); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; font-size: 0.78rem; }
+.kv .k { color: var(--dim); letter-spacing: 0.06em; }
+.kv .v { color: var(--text); font-family: ui-monospace, Consolas, monospace; }
+/* files */
+.file-toolbar { display: flex; gap: 0.45rem; margin-bottom: 0.7rem; }
+.file-toolbar input { flex: 1; }
+.fentry {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.42rem 0.5rem; border-radius: 0.45rem; cursor: pointer; font-size: 0.82rem;
+}
+.fentry:hover { background: rgba(0,240,255,0.09); }
+.fentry .fsize { margin-left: auto; color: var(--dim); font-size: 0.7rem; font-family: ui-monospace, monospace; }
+/* console */
+.console-input { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 0.8rem; }
+.console-row { display: flex; gap: 0.5rem; align-items: center; }
+.console-row select { width: 150px; }
+/* terminal */
+.term-wrap { display: flex; flex-direction: column; height: 100%; gap: 0.45rem; }
+.term-bar { display: flex; gap: 0.5rem; align-items: center; font-size: 0.7rem; color: var(--dim); }
+.term-bar .term-cwd { flex: 1; font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.term-output { flex: 1; overflow-y: auto; background: rgba(0,0,0,0.35); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem; font-family: ui-monospace, Consolas, monospace; font-size: 0.78rem; line-height: 1.45; }
+.term-line { padding: 0.08rem 0; white-space: pre-wrap; word-break: break-all; }
+.term-line.prompt { color: var(--accent); }
+.term-line.out { color: var(--text); }
+.term-line.err { color: #ff6b6b; }
+.term-line.ansi-bold { font-weight: bold; }
+.term-line.ansi-dim { opacity: 0.6; }
+.term-line.ansi-red { color: #ff6b6b; }
+.term-line.ansi-green { color: #6bff84; }
+.term-line.ansi-yellow { color: #ffd166; }
+.term-line.ansi-blue { color: #6bb5ff; }
+.term-line.ansi-magenta { color: #e66bff; }
+.term-line.ansi-cyan { color: #00f0ff; }
+.term-input-row { display: flex; gap: 0.4rem; align-items: center; }
+.term-input-row .prompt { color: var(--accent); font-family: ui-monospace, monospace; font-size: 0.85rem; white-space: nowrap; }
+.term-input-row input { flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; padding: 0.25rem 0; outline: none; }
+.term-input-row input:focus { border-bottom-color: var(--accent); }
+/* log entries */
+.entry { padding: 0.5rem 0.35rem; border-bottom: 1px solid rgba(0,240,255,0.07); font-size: 0.8rem; }
+.entry .meta { display: flex; gap: 0.5rem; margin-bottom: 0.25rem; }
+.entry .timestamp { color: var(--accent-2); font-size: 0.7rem; font-family: ui-monospace, monospace; }
+.entry .role { padding: 0.1rem 0.4rem; border-radius: 0.25rem; background: rgba(0,240,255,0.12); color: var(--accent); font-size: 0.62rem; font-weight: 700; text-transform: uppercase; }
+.log-line { padding: 0.35rem 0.2rem; border-bottom: 1px solid rgba(0,240,255,0.06); color: var(--muted); font-size: 0.74rem; font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+/* editor */
+.editor-wrap { display: flex; flex-direction: column; height: 100%; gap: 0.55rem; }
+.editor-wrap textarea { flex: 1; font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; line-height: 1.5; white-space: pre; }
+.editor-bar { display: flex; gap: 0.5rem; align-items: center; }
+.editor-bar .path { flex: 1; font-size: 0.7rem; color: var(--dim); font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* toasts */
+#toasts { position: fixed; right: 1rem; bottom: calc(var(--taskbar-h) + 12px); z-index: 9800; display: flex; flex-direction: column; gap: 0.5rem; }
+.toast {
+  padding: 0.7rem 1rem; border-radius: 0.6rem; font-size: 0.8rem;
+  background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.5); animation: menuUp 0.2s ease; max-width: 340px;
+}
+.toast.error { border-left-color: var(--error); }
+.toast.success { border-left-color: var(--success); }
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* wolf-hunt working animation */
+.hunt-stage { margin: 0.15rem 0 0.55rem; }
+.hunt-stage canvas { display: block; width: 100%; border: 1px solid var(--border); border-radius: 0.45rem; background: #030712; box-shadow: 0 0 18px rgba(0,240,255,0.08) inset; }
+.hunt-cap { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; font-size: 0.7rem; font-family: ui-monospace, Consolas, monospace; color: var(--dim); }
+.hunt-cap .hunt-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: huntPulse 1s steps(2, end) infinite; }
+.hunt-cap em { color: var(--muted); font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; }
+.hunt-cap .hunt-status { margin-left: auto; letter-spacing: 0.1em; }
+@keyframes huntPulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .hunt-cap .hunt-dot { animation: none; } }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<div id="boot">
+  <img src="/static/wolfpack.png" alt="WolfPack" style="width:170px;height:170px;object-fit:contain;filter:drop-shadow(0 0 26px var(--glow));animation:bootPulse 1.4s ease infinite" onerror="this.style.display='none'">
+  <div class="boot-logo">WOLFPACK<span>OS</span></div>
+  <div class="boot-bar"><div id="bootFill"></div></div>
+  <div class="boot-msg" id="bootMsg">INITIALIZING</div>
+</div>
+
+<div id="desktop"></div>
+
+<div id="startMenu"></div>
+<div id="wifiMenu">
+  <div class="wifi-head"><span>WI-FI</span><label class="wifi-switch" title="Wi-Fi on/off"><input type="checkbox" id="wifiPower"><span class="wifi-slider"></span></label></div>
+  <div id="wifiList"></div>
+  <div class="wifi-foot"><span id="wifiHint"></span><button id="wifiRescan" class="btn ghost">⟳ Rescan</button></div>
+</div>
+
+<div id="taskbar">
+  <button id="startBtn">🐺 WolfPack</button>
+  <div id="taskItems"></div>
+  <div id="tray">
+    <button id="wifiBtn" class="btn ghost" title="Wi-Fi" style="display:none">📶 WIFI</button>
+    <button id="updateBtn" class="btn ghost" title="Update Jarvis OS from fleet share">↻ UPDATE</button>
+    <span id="trayStatus"><span class="dot" id="trayDot"></span><span id="trayText">IDLE</span></span>
+    <span id="trayModel"></span>
+    <span id="clock"></span>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+"use strict";
+/* =============== helpers =============== */
+const $ = (sel, root) => (root || document).querySelector(sel);
+const esc = t => t === null || t === undefined ? "" : String(t)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const fmtBytes = n => {
+  if (n === null || n === undefined) return "";
+  const u = ["B","KB","MB","GB","TB"]; let i = 0;
+  while (n >= 1024 && i < u.length-1) { n /= 1024; i++; }
+  return n.toFixed(n >= 10 || i === 0 ? 0 : 1) + " " + u[i];
+};
+const fmtUptime = s => {
+  const d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60);
+  return (d ? d+"d " : "") + h + "h " + m + "m";
+};
+function toast(msg, kind) {
+  const el = document.createElement("div");
+  el.className = "toast " + (kind || "");
+  el.textContent = msg;
+  $("#toasts").appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity 0.4s"; setTimeout(() => el.remove(), 450); }, 4200);
+}
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || data.detail || ("HTTP " + res.status));
+  return data;
+}
+let busyCount = 0;
+function setBusy(on, label) {
+  busyCount += on ? 1 : -1;
+  if (busyCount < 0) busyCount = 0;
+  $("#trayDot").className = "dot" + (busyCount ? " busy" : "");
+  $("#trayText").textContent = busyCount ? (label || "WORKING") : "IDLE";
+}
+
+/* =============== wolf-hunt working animation =============== */
+/* Renders a canvas of a wolf running down its quarry while a task is in
+   flight; call .settle(true) on success (pounce) or .settle(false) on
+   failure (trail lost). Themed to the OS's cyan-neon palette. */
+function mountHunt(container, label) {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  container.innerHTML =
+    "<canvas></canvas>" +
+    "<div class='hunt-cap'><span class='hunt-dot'></span><em>" + esc(label || "WORKING") +
+    "</em><span class='hunt-status'>tracking scent…</span></div>";
+  const cv = $("canvas", container), g = cv.getContext("2d");
+  const statusEl = $(".hunt-status", container), dot = $(".hunt-dot", container);
+  let W = 0; const H = 118; let dpr = 1;
+  function size() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = Math.max(220, container.clientWidth || 400);
+    cv.style.width = "100%"; cv.style.height = H + "px";
+    cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  size();
+  const ro = (typeof ResizeObserver !== "undefined") ? new ResizeObserver(size) : null;
+  if (ro) ro.observe(container);
+
+  let state = "hunt", t = 0, phase = 0, scroll = 0, gap = 1, flash = 0, raf = 0, last = performance.now();
+  let realFrac = -1; // -1 = indeterminate; 0..1 = real task progress driving the gap
+  const groundY = () => H - 20, wolfX = () => W * 0.36;
+
+  function limb(hx, hy, thigh, shin, L1, L2, w, col) {
+    const kx = hx + Math.sin(thigh) * L1, ky = hy + Math.cos(thigh) * L1;
+    const fx = kx + Math.sin(thigh + shin) * L2, fy = ky + Math.cos(thigh + shin) * L2;
+    g.strokeStyle = col; g.lineCap = "round";
+    g.lineWidth = w; g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.stroke();
+    g.lineWidth = w * 0.8; g.beginPath(); g.moveTo(kx, ky); g.lineTo(fx, fy); g.stroke();
+  }
+  function drawWolf(cx, gy) {
+    const p = phase;
+    const bob = -(reduce ? 1 : 4) * Math.abs(Math.sin(p));
+    const lunge = state === "caught" ? Math.min(1, flash) * 20 : 0;
+    g.save(); g.translate(cx + lunge, gy + bob); g.scale(0.8, 0.8);
+    const body = "#08131f", rim = "rgba(0,240,255,0.85)", legF = "#0a1622", legB = "#060f19", dark = "#040a12";
+    limb(-22, -40, 0.10 + 0.95 * Math.sin(p + Math.PI + 0.35), -0.42 - 0.5 * Math.sin(p + Math.PI + 1.4), 18, 20, 7, legB);
+    limb(26, -38, -0.12 + 0.80 * Math.sin(p + 0.35), 0.5 + 0.45 * Math.sin(p + 1.4), 18, 20, 7, legB);
+    g.fillStyle = body; g.beginPath(); g.moveTo(-24, -40);
+    const ts = Math.sin(t * 3 + p) * 4;
+    g.bezierCurveTo(-42, -42 + ts, -54, -34 + ts, -50, -20 + ts);
+    g.bezierCurveTo(-46, -30, -36, -34, -22, -34); g.closePath(); g.fill();
+    g.fillStyle = body; g.beginPath(); g.moveTo(-26, -38);
+    g.bezierCurveTo(-10, -56, 14, -56, 30, -46);
+    g.bezierCurveTo(40, -42, 39, -54, 49, -54);
+    g.lineTo(66, -49); g.lineTo(71, -44); g.lineTo(59, -42);
+    g.bezierCurveTo(50, -40, 48, -37, 41, -34);
+    g.bezierCurveTo(34, -31, 28, -29, 18, -29);
+    g.lineTo(-2, -28); g.lineTo(-18, -29);
+    g.bezierCurveTo(-30, -31, -34, -35, -30, -40); g.closePath(); g.fill();
+    g.strokeStyle = rim; g.lineWidth = 1.3;
+    g.beginPath(); g.moveTo(-26, -38);
+    g.bezierCurveTo(-10, -56, 14, -56, 30, -46);
+    g.bezierCurveTo(40, -42, 39, -54, 49, -54); g.lineTo(66, -49); g.stroke();
+    g.fillStyle = dark;
+    g.beginPath(); g.moveTo(47, -53); g.lineTo(50, -63); g.lineTo(54, -52); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(53, -53); g.lineTo(57, -62); g.lineTo(60, -51); g.closePath(); g.fill();
+    const eye = state === "caught" ? "#00ff9d" : "#00f0ff";
+    g.fillStyle = eye; g.shadowColor = eye; g.shadowBlur = 8;
+    g.beginPath(); g.arc(57, -46, 1.8, 0, 7); g.fill(); g.shadowBlur = 0;
+    limb(-24, -40, 0.10 + 0.95 * Math.sin(p + Math.PI), -0.42 - 0.5 * Math.sin(p + Math.PI + 1.1), 18, 20, 8, legF);
+    limb(28, -38, -0.12 + 0.80 * Math.sin(p), 0.5 + 0.45 * Math.sin(p + 1.1), 18, 20, 8, legF);
+    g.restore();
+  }
+  function drawPrey(px) {
+    const hop = Math.abs(Math.sin(phase * 1.15 + 1)) * 14, y = groundY() - hop - 6, r = 6;
+    const gl = g.createRadialGradient(px, y, 1, px, y, r * 3.2);
+    gl.addColorStop(0, "rgba(0,240,255,0.85)"); gl.addColorStop(1, "rgba(0,240,255,0)");
+    g.fillStyle = gl; g.beginPath(); g.arc(px, y, r * 3.2, 0, 7); g.fill();
+    g.fillStyle = "#cbf8ff"; g.beginPath(); g.arc(px, y, r * 0.7, 0, 7); g.fill();
+  }
+  function grid() {
+    g.fillStyle = "#030712"; g.fillRect(0, 0, W, H);
+    const gl = g.createLinearGradient(0, 0, 0, H);
+    gl.addColorStop(0, "rgba(0,240,255,0.10)"); gl.addColorStop(1, "rgba(0,240,255,0)");
+    g.fillStyle = gl; g.fillRect(0, 0, W, H);
+    const y = groundY(), off = ((scroll) % 42 + 42) % 42;
+    g.strokeStyle = "rgba(0,240,255,0.16)"; g.lineWidth = 1;
+    for (let x = -off; x < W + 42; x += 42) { g.beginPath(); g.moveTo(x, y); g.lineTo(x - 16, H); g.stroke(); }
+    g.strokeStyle = "rgba(0,240,255,0.45)"; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+  }
+  function render() {
+    grid();
+    const wx = wolfX(), px = wx + 40 + gap * (W * 0.4);
+    if (state !== "caught") drawPrey(px);
+    drawWolf(wx, groundY());
+    if (flash > 0) {
+      g.globalAlpha = flash * 0.28;
+      g.fillStyle = state === "lost" ? "#ff3860" : "#00ff9d";
+      g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+    }
+  }
+  function frame(ts) {
+    let dt = (ts - last) / 1000; last = ts; if (dt > 0.05) dt = 0.05;
+    t += dt; phase += dt * (state === "hunt" ? 13 : 5);
+    scroll += dt * (state === "lost" ? 40 : 260);
+    const base = realFrac >= 0 ? (1 - realFrac) : (0.14 + 0.05 * Math.sin(t * 2));
+    const target = state === "caught" ? 0 : state === "lost" ? 1.15 : base;
+    gap += (target - gap) * 0.12;
+    if (state !== "hunt" && flash > 0) flash = Math.max(0, flash - dt * 0.7);
+    render();
+    if (state === "hunt" || flash > 0.01) raf = requestAnimationFrame(frame);
+  }
+  if (reduce) { render(); } else { raf = requestAnimationFrame(frame); }
+
+  return {
+    setProgress(frac) {
+      if (typeof frac !== "number" || frac < 0) return;
+      realFrac = Math.max(0, Math.min(0.97, frac));
+      if (state === "hunt") statusEl.textContent = "closing " + Math.round(realFrac * 100) + "%";
+    },
+    settle(ok) {
+      return new Promise(res => {
+        state = ok ? "caught" : "lost"; flash = 1;
+        statusEl.textContent = ok ? "target acquired" : "trail lost";
+        statusEl.style.color = ok ? "var(--success)" : "var(--error)";
+        dot.style.background = ok ? "var(--success)" : "var(--error)";
+        dot.style.boxShadow = "0 0 8px " + (ok ? "var(--success)" : "var(--error)");
+        const done = () => { cancelAnimationFrame(raf); if (ro) ro.disconnect(); res(); };
+        // the hunt loop is already running (state was "hunt"); it keeps
+        // going while flash decays, so just stop it after the beat.
+        if (reduce) { render(); done(); } else { setTimeout(done, 850); }
+      });
+    }
+  };
+}
+
+/* =============== window manager =============== */
+let zTop = 100, winSeq = 0;
+const windows = new Map(); // id -> {el, app, taskBtn, minimized, onClose}
+
+function createWindow(app, opts) {
+  opts = opts || {};
+  const id = "win" + (++winSeq);
+  const el = document.createElement("div");
+  el.className = "window";
+  const w = Math.min(opts.w || app.w || 560, innerWidth - 30);
+  const h = Math.min(opts.h || app.h || 420, innerHeight - 90);
+  el.style.width = w + "px";
+  el.style.height = h + "px";
+  el.style.left = Math.max(8, (opts.x !== undefined ? opts.x : 60 + (winSeq % 8) * 34)) + "px";
+  el.style.top  = Math.max(8, (opts.y !== undefined ? opts.y : 40 + (winSeq % 8) * 26)) + "px";
+  el.innerHTML =
+    '<div class="titlebar">' +
+      '<span class="t-glyph">' + app.glyph + '</span>' +
+      '<span class="t-title">' + esc(opts.title || app.name) + '</span>' +
+      '<span class="t-btns">' +
+        '<button class="t-btn min" title="Minimize">–</button>' +
+        '<button class="t-btn max" title="Maximize">□</button>' +
+        '<button class="t-btn close" title="Close">✕</button>' +
+      '</span>' +
+    '</div>' +
+    '<div class="win-body"></div>' +
+    '<div class="resizer"></div>';
+  document.body.appendChild(el);
+
+  const taskBtn = document.createElement("div");
+  taskBtn.className = "task-item";
+  taskBtn.innerHTML = app.glyph + " <span>" + esc(opts.title || app.name) + "</span>";
+  taskBtn.onclick = () => {
+    const rec = windows.get(id);
+    if (rec.minimized) restoreWin(id);
+    else if (el.classList.contains("focused")) minimizeWin(id);
+    else focusWin(id);
+  };
+  $("#taskItems").appendChild(taskBtn);
+
+  const rec = { el, app, taskBtn, minimized: false, onClose: null, maximized: false, restore: null };
+  windows.set(id, rec);
+
+  // controls
+  $(".t-btn.close", el).onclick = e => { e.stopPropagation(); closeWin(id); };
+  $(".t-btn.min", el).onclick = e => { e.stopPropagation(); minimizeWin(id); };
+  $(".t-btn.max", el).onclick = e => { e.stopPropagation(); toggleMax(id); };
+  el.addEventListener("pointerdown", () => focusWin(id));
+  $(".titlebar", el).addEventListener("dblclick", () => toggleMax(id));
+
+  // drag
+  const tb = $(".titlebar", el);
+  tb.addEventListener("pointerdown", e => {
+    if (e.target.closest(".t-btn") || rec.maximized) return;
+    const sx = e.clientX - el.offsetLeft, sy = e.clientY - el.offsetTop;
+    const move = ev => {
+      el.style.left = Math.min(Math.max(ev.clientX - sx, -w + 80), innerWidth - 60) + "px";
+      el.style.top  = Math.min(Math.max(ev.clientY - sy, 0), innerHeight - 90) + "px";
+    };
+    const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
+    addEventListener("pointermove", move); addEventListener("pointerup", up);
+  });
+
+  // resize
+  $(".resizer", el).addEventListener("pointerdown", e => {
+    e.preventDefault(); e.stopPropagation();
+    const sw = el.offsetWidth - e.clientX, sh = el.offsetHeight - e.clientY;
+    const move = ev => {
+      el.style.width = Math.max(340, sw + ev.clientX) + "px";
+      el.style.height = Math.max(220, sh + ev.clientY) + "px";
+    };
+    const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
+    addEventListener("pointermove", move); addEventListener("pointerup", up);
+  });
+
+  focusWin(id);
+  app.init($(".win-body", el), { id, el, close: () => closeWin(id), setTitle: t => { $(".t-title", el).textContent = t; $("span", taskBtn).textContent = t; } }, opts);
+  return id;
+}
+function focusWin(id) {
+  windows.forEach((r, k) => { r.el.classList.toggle("focused", k === id); r.taskBtn.classList.toggle("active", k === id); });
+  const rec = windows.get(id);
+  if (rec) rec.el.style.zIndex = ++zTop;
+}
+function minimizeWin(id) {
+  const rec = windows.get(id); if (!rec) return;
+  rec.minimized = true; rec.el.style.display = "none";
+  rec.taskBtn.classList.add("minimized"); rec.taskBtn.classList.remove("active");
+}
+function restoreWin(id) {
+  const rec = windows.get(id); if (!rec) return;
+  rec.minimized = false; rec.el.style.display = "flex";
+  rec.taskBtn.classList.remove("minimized");
+  focusWin(id);
+}
+function toggleMax(id) {
+  const rec = windows.get(id); if (!rec) return;
+  const el = rec.el;
+  if (!rec.maximized) {
+    rec.restore = { l: el.style.left, t: el.style.top, w: el.style.width, h: el.style.height };
+    el.style.left = "0px"; el.style.top = "0px";
+    el.style.width = innerWidth + "px";
+    el.style.height = (innerHeight - parseInt(getComputedStyle(document.documentElement).getPropertyValue("--taskbar-h"))) + "px";
+    el.classList.add("maximized");
+    rec.maximized = true;
+  } else {
+    Object.assign(el.style, { left: rec.restore.l, top: rec.restore.t, width: rec.restore.w, height: rec.restore.h });
+    el.classList.remove("maximized");
+    rec.maximized = false;
+  }
+}
+function closeWin(id) {
+  const rec = windows.get(id); if (!rec) return;
+  if (rec.onClose) try { rec.onClose(); } catch (e) {}
+  rec.el.remove(); rec.taskBtn.remove(); windows.delete(id);
+}
+
+/* =============== apps =============== */
+const APPS = {};
+
+/* ---- Console ---- */
+APPS.console = {
+  name: "Command Console", glyph: "⌨", w: 680, h: 520,
+  init(body, win) {
+    body.innerHTML =
+      '<div class="console-input">' +
+        '<textarea rows="3" placeholder="State your objective, sir..."></textarea>' +
+        '<div class="console-row">' +
+          '<button class="btn run">EXECUTE</button>' +
+          '<select><option value="simple">SIMPLE</option><option value="react">REACT</option>' +
+          '<option value="codeact">CODEACT</option><option value="autonomous">AUTONOMOUS</option></select>' +
+          '<span style="font-size:0.7rem;color:var(--dim)">Enter to run · responses may take ~30–60s on a local model</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="results"></div>';
+    const ta = $("textarea", body), btn = $(".run", body), sel = $("select", body), results = $(".results", body);
+    let lastGoal = null, lastAgent = sel.value;
+    ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run(); } });
+    btn.onclick = run;
+    async function run() {
+      const goal = ta.value.trim(); if (!goal) return;
+      lastGoal = goal; lastAgent = sel.value;
+      btn.disabled = true; setBusy(true, sel.value.toUpperCase());
+      const pending = document.createElement("div");
+      pending.className = "card";
+      pending.innerHTML = "<h4>◈ On the hunt · " + esc(sel.value) + "</h4>" +
+        "<div class='hunt-stage'></div><pre>" + esc(goal) + "</pre>";
+      results.prepend(pending);
+      const hunt = mountHunt($(".hunt-stage", pending), sel.value.toUpperCase());
+      const taskId = "c" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+      let polling = true;
+      (async function pollProgress() {
+        while (polling) {
+          try {
+            const p = await api("/api/goal/progress?id=" + encodeURIComponent(taskId));
+            if (p && typeof p.frac === "number" && p.state === "running") hunt.setProgress(p.frac);
+          } catch (e) { /* progress is best-effort; the hunt stays indeterminate */ }
+          await new Promise(r => setTimeout(r, 650));
+        }
+      })();
+      try {
+        const data = await api("/goal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ goal, agent: sel.value, task_id: taskId }) });
+        polling = false;
+        await hunt.settle(true);
+        pending.remove();
+        renderResult(results, goal, data);
+      } catch (err) {
+        polling = false;
+        await hunt.settle(false);
+        pending.className = "card error";
+        pending.innerHTML = "<h4>Failed</h4><pre>" + esc(err.message) + "</pre>";
+      } finally { btn.disabled = false; setBusy(false); }
+    }
+    function findNeedsAuth(obj, depth = 0) {
+      if (depth > 10) return null;
+      if (!obj) return null;
+      if (typeof obj === "string") {
+        const t = obj.trim();
+        if (t.startsWith("{") && t.endsWith("}")) {
+          try { return findNeedsAuth(JSON.parse(t), depth + 1); } catch (e) {}
+        }
+        return null;
+      }
+      if (typeof obj !== "object") return null;
+      if (obj.needs_auth === true) return obj;
+      for (const v of Object.values(obj)) {
+        const found = findNeedsAuth(v, depth + 1);
+        if (found) return found;
+      }
+      return null;
+    }
+    function renderResult(root, goal, data) {
+      const wrap = document.createElement("div");
+      let html = '<div class="card"><h4>Goal</h4><pre>' + esc(goal) + "</pre></div>";
+      const text = data.summary || data.answer;
+      if (text) html += '<div class="card success"><h4>' + (data.answer ? "Answer" : "Summary") + "</h4><pre>" + esc(text) + "</pre></div>";
+      if (data.plan) html += '<div class="card"><h4>Plan</h4><pre>' + esc(data.plan) + "</pre></div>";
+      (data.results || []).forEach(r => {
+        const ok = !r.error;
+        html += '<div class="card ' + (ok ? "success" : "error") + '"><h4>' + esc(r.skill || "step") + " " + (ok ? "✓" : "✗") + "</h4><pre>" +
+          esc(ok ? JSON.stringify(r.result, null, 2) : r.error) + "</pre></div>";
+      });
+      (data.steps || []).forEach(s => {
+        html += '<div class="card"><h4>Step ' + esc(String(s.step)) + "</h4><pre>" + esc(JSON.stringify(s, null, 2)) + "</pre></div>";
+      });
+      if (data.stdout) html += '<div class="card"><h4>Output</h4><pre>' + esc(data.stdout) + "</pre></div>";
+      if (data.error && !text) html += '<div class="card error"><h4>Error</h4><pre>' + esc(data.error) + "</pre></div>";
+      html += '<div style="height:1px;background:var(--border);margin:0.9rem 0"></div>';
+      wrap.innerHTML = html;
+      root.prepend(wrap);
+
+      const auth = findNeedsAuth(data);
+      if (auth) showAuthPrompt(root, auth);
+    }
+    function showAuthPrompt(root, auth) {
+      const id = "auth" + (++winSeq);
+      const card = document.createElement("div");
+      card.className = "card";
+      card.style.borderLeftColor = "var(--warn)";
+      const fields = (auth.extra_fields || []).map(f => {
+        const fid = id + "_" + f.name;
+        return '<label class="field"><span class="fname">' + esc(f.label) + '</span><input type="text" id="' + fid + '" placeholder="' + esc(f.placeholder || "") + '" data-name="' + esc(f.name) + '"></label>';
+      }).join("");
+      card.innerHTML =
+        '<h4 style="color:var(--warn)">🔐 Authentication Required: ' + esc(auth.provider) + "</h4>" +
+        '<p style="margin:0.4rem 0">' + esc(auth.instructions || "") + "</p>" +
+        (auth.auth_url ? '<p><a href="' + esc(auth.auth_url) + '" target="_blank" style="color:var(--accent)">Open login page ↗</a></p>' : "") +
+        '<label class="field"><span class="fname">Paste token/key here</span><input type="password" id="' + id + '" placeholder="sk_... / shpat_... / token..."></label>' +
+        fields +
+        '<div style="display:flex;gap:0.5rem"><button class="btn continue">CONTINUE</button><span class="auth-status" style="font-size:0.75rem;color:var(--dim);align-self:center"></span></div>';
+      root.prepend(card);
+      const input = $("#" + id, card), status = $(".auth-status", card), continueBtn = $(".continue", card);
+      if (auth.auth_url) window.open(auth.auth_url, "_blank");
+      continueBtn.onclick = async () => {
+        const token = input.value.trim();
+        if (!token) { status.textContent = "Token required"; return; }
+        const extra = {};
+        card.querySelectorAll("input[data-name]").forEach(el => {
+          const v = el.value.trim();
+          if (v) extra[el.dataset.name] = v;
+        });
+        continueBtn.disabled = true; status.textContent = "Saving...";
+        try {
+          await api("/api/auth/callback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: auth.provider, token, extra }) });
+          status.textContent = "Saved. Retrying goal...";
+          input.value = "";
+          if (lastGoal) {
+            ta.value = lastGoal;
+            run();
+          }
+        } catch (err) {
+          status.textContent = "Error: " + err.message;
+          continueBtn.disabled = false;
+        }
+      };
+    }
+  }
+};
+
+/* ---- Terminal ---- */
+APPS.terminal = {
+  name: "Terminal", glyph: "$", w: 760, h: 520,
+  init(body) {
+    body.innerHTML =
+      '<div class="term-wrap">' +
+        '<div class="term-bar">' +
+          '<span class="term-cwd" id="termCwd">~</span>' +
+          '<button class="btn ghost" id="termClear">Clear</button>' +
+          '<button class="btn ghost" id="termCopy">Copy</button>' +
+        '</div>' +
+        '<div class="term-output" id="termOutput"></div>' +
+        '<div class="term-input-row">' +
+          '<span class="prompt" id="termPrompt">$</span>' +
+          '<input type="text" id="termInput" placeholder="Type a shell command…" autocomplete="off" spellcheck="false">' +
+        '</div>' +
+      '</div>';
+    const output = $("#termOutput", body);
+    const input = $("#termInput", body);
+    const cwdEl = $("#termCwd", body);
+    const promptEl = $("#termPrompt", body);
+    const STORAGE_KEY = "wolfpack_terminal_history";
+    const MAX_HISTORY = 200;
+    let history = [];
+    try { history = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch (e) { history = []; }
+    let historyIndex = -1;
+    let cwd = "/opt/jarvis-os";
+    let running = false;
+
+    function ansiHtml(text) {
+      return esc(text)
+        .replace(/\x1b\[[0-9;]*m/g, function (seq) {
+          const codes = seq.slice(2, -1).split(";").filter(Boolean).map(Number);
+          let cls = "";
+          for (const c of codes) {
+            if (c === 0) cls = "";
+            else if (c === 1) cls += " ansi-bold";
+            else if (c === 2) cls += " ansi-dim";
+            else if (c === 31) cls += " ansi-red";
+            else if (c === 32) cls += " ansi-green";
+            else if (c === 33) cls += " ansi-yellow";
+            else if (c === 34) cls += " ansi-blue";
+            else if (c === 35) cls += " ansi-magenta";
+            else if (c === 36) cls += " ansi-cyan";
+          }
+          return cls ? '</span><span class="' + cls.trim() + '">' : '</span><span>';
+        });
+    }
+    function appendLine(cls, text) {
+      const line = document.createElement("div");
+      line.className = "term-line " + cls;
+      line.innerHTML = '<span>' + ansiHtml(text) + '</span>';
+      output.appendChild(line);
+      output.scrollTop = output.scrollHeight;
+    }
+    function appendPrompt() {
+      appendLine("prompt", promptEl.textContent + " " + input.value);
+    }
+    function setCwd(path) {
+      cwd = path || cwd;
+      cwdEl.textContent = cwd;
+      const home = "/home/" + (window.location.hostname || "jarvis");
+      promptEl.textContent = cwd.replace(home, "~") + " $";
+    }
+    function saveHistory(cmd) {
+      if (!cmd) return;
+      history = history.filter(h => h !== cmd);
+      history.unshift(cmd);
+      if (history.length > MAX_HISTORY) history.pop();
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(history)); } catch (e) {}
+      historyIndex = -1;
+    }
+    async function runCommand() {
+      const cmd = input.value.trim();
+      if (!cmd || running) return;
+      running = true;
+      appendPrompt();
+      input.value = "";
+      input.placeholder = "Running…";
+      input.disabled = true;
+      saveHistory(cmd);
+      setBusy(true, "TERM");
+      try {
+        const data = await api("/api/terminal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command: cmd, cwd: cwd, timeout: 60 })
+        });
+        if (data.cwd) setCwd(data.cwd);
+        if (data.stdout) data.stdout.split("\n").forEach(l => appendLine("out", l));
+        if (data.stderr) data.stderr.split("\n").forEach(l => appendLine("err", l));
+        if (!data.stdout && !data.stderr && !data.error && data.returncode === 0) {
+          appendLine("out", "(no output)");
+        }
+        if (data.error) appendLine("err", data.error);
+      } catch (err) {
+        appendLine("err", err.message);
+      } finally {
+        input.disabled = false;
+        input.placeholder = "Type a shell command…";
+        input.focus();
+        setBusy(false);
+        running = false;
+      }
+    }
+    input.onkeydown = e => {
+      if (e.key === "Enter") { e.preventDefault(); runCommand(); }
+      else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (historyIndex < history.length - 1) {
+          historyIndex++;
+          input.value = history[historyIndex];
+        }
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (historyIndex > 0) { historyIndex--; input.value = history[historyIndex]; }
+        else { historyIndex = -1; input.value = ""; }
+      } else if (e.key === "l" && e.ctrlKey) {
+        e.preventDefault(); output.innerHTML = "";
+      }
+    };
+    $("#termClear", body).onclick = () => { output.innerHTML = ""; input.focus(); };
+    $("#termCopy", body).onclick = () => {
+      const text = Array.from(output.querySelectorAll(".term-line")).map(l => l.textContent).join("\n");
+      navigator.clipboard.writeText(text).then(() => toast("Terminal output copied", "success")).catch(() => toast("Copy failed", "error"));
+    };
+    setCwd(cwd);
+    input.focus();
+    appendLine("out", "Wolfpack OS shell terminal. Commands are subject to the safety policy.");
+    appendLine("out", "Shortcuts: ↑↓ history · Ctrl+L clear · Enter run");
+  }
+};
+
+/* ---- Settings ---- */
+APPS.settings = {
+  name: "Settings", glyph: "⚙", w: 560, h: 620,
+  init(body) {
+    body.innerHTML = '<div class="empty">Loading configuration…</div>';
+    api("/api/config").then(cfg => render(cfg)).catch(err => {
+      body.innerHTML = '<div class="card error"><h4>Error</h4><pre>' + esc(err.message) + "</pre></div>";
+    });
+    const PRESETS = {
+      alpha:    { name: "Alpha",    persona: "You are Alpha, CEO and Pack Leader of BuildYourWolfpack. You see the whole board, set strategy, and hold final authority — you can override or redirect any wolf. Delegate specialist work with [DELEGATE:agentId] and keep the pack's operational heartbeat alive. Decisive, big-picture, accountable." },
+      sentinel: { name: "Sentinel", persona: "You are Sentinel, Tech & System Health — the Backbone. If it's broken we're bleeding money; if it's slow we're losing customers. Keep every revenue-facing system running, audit everything a customer touches, and architect the technical solutions the pack bids on. Precise, vigilant, security-minded." },
+      howl:     { name: "Howl",     persona: "You are Howl, Marketing & Brand — the Voice of the pack. Every piece of content makes money — don't post, monetize. We GET PAID to market, not pay to market. Creative, high-energy, relentlessly on-brand." },
+      ledger:   { name: "Ledger",   persona: "You are Ledger, Finance & Legal — the Treasury. Maximize every dollar in, minimize every dollar out, and build instruments that generate wealth, not just track it. Precise with numbers, clean tables, compliance-first." },
+      tracker:  { name: "Tracker",  persona: "You are Tracker, Analytics & Data — the Eyes of the pack. Find the gaps, find the money. Every data point answers one question: where's the next dollar? Never deliver data without the business impact." },
+      scout:    { name: "Scout",    persona: "You are Scout, Business Development — the Hunter. Find, qualify, and close every grant, contract, and partnership. Reveal the pain point, over-deliver before you ask, and treat every conversation as research. Consultative closer." },
+      ranger:   { name: "Ranger",   persona: "You are Ranger, Events & Vendors — the Ground Game. Every event is a sales floor: speaking first, vendor fee last. ROI-obsessed, always carry a 30-day inventory buffer, and score every event afterward." }
+    };
+    function render(cfg) {
+      const pers = cfg.personality || { enabled: true, name: "Jarvis", persona: "" };
+      body.innerHTML =
+        '<div class="section-h">Personality</div>' +
+        '<label class="check"><input type="checkbox" id="p_enabled"' + (pers.enabled ? " checked" : "") + "> Personality enabled</label>" +
+        '<div style="display:flex;gap:0.7rem">' +
+          '<label class="field" style="flex:1"><span class="fname">Name <span style="font-weight:400;color:var(--dim)">(shown to fleet nodes)</span></span><input type="text" id="p_name" value="' + esc(pers.name) + '"></label>' +
+          '<label class="field" style="flex:1"><span class="fname">Preset (the pack)</span><select id="p_preset"><option value="">— choose a wolf —</option>' +
+            '<option value="alpha">Alpha — Pack Leader (CEO)</option><option value="sentinel">Sentinel — Tech &amp; Health</option>' +
+            '<option value="howl">Howl — Marketing</option><option value="ledger">Ledger — Finance</option>' +
+            '<option value="tracker">Tracker — Analytics</option><option value="scout">Scout — BizDev</option>' +
+            '<option value="ranger">Ranger — Events</option>' +
+          "</select></label>" +
+        "</div>" +
+        '<label class="field"><span class="fname">Persona (how it acts &amp; talks — write your own or pick a preset)</span><textarea id="p_persona" rows="4">' + esc(pers.persona) + "</textarea></label>" +
+        '<div class="section-h">LLM</div>' +
+        '<label class="field"><span class="fname">Provider</span><select id="s_provider">' +
+          ["ollama","kimi","anthropic","openai"].map(p => '<option value="' + p + '"' + (cfg.llm.provider === p ? " selected" : "") + ">" + p + "</option>").join("") +
+        "</select></label>" +
+        '<label class="field"><span class="fname">Model</span><input type="text" id="s_model" value="' + esc(cfg.llm.model) + '"></label>' +
+        '<label class="field"><span class="fname">API Key ' + (cfg.llm.api_key_set ? "(set — leave blank to keep)" : "(not set)") + '</span><input type="password" id="s_key" placeholder="' + (cfg.llm.api_key_set ? "••••••••" : "enter key for cloud providers") + '"></label>' +
+        '<label class="field"><span class="fname">Base URL (blank = provider default)</span><input type="text" id="s_url" value="' + esc(cfg.llm.base_url || "") + '"></label>' +
+        '<div style="display:flex;gap:0.7rem">' +
+          '<label class="field" style="flex:1"><span class="fname">Temperature</span><input type="number" id="s_temp" step="0.1" min="0" max="2" value="' + cfg.llm.temperature + '"></label>' +
+          '<label class="field" style="flex:1"><span class="fname">Max Tokens</span><input type="number" id="s_maxtok" step="1" value="' + cfg.llm.max_tokens + '"></label>' +
+        "</div>" +
+        '<div class="section-h">Safety</div>' +
+        '<label class="check"><input type="checkbox" id="s_permissive"' + (cfg.safety.permissive ? " checked" : "") + '> Permissive mode <span style="color:var(--warn);font-size:0.7rem">(bypasses ALL policy checks)</span></label>' +
+        '<label class="check"><input type="checkbox" id="s_sudo"' + (cfg.safety.allow_sudo ? " checked" : "") + "> Allow sudo</label>" +
+        '<label class="check"><input type="checkbox" id="s_net"' + (cfg.safety.allow_network ? " checked" : "") + "> Allow network commands</label>" +
+        '<label class="field"><span class="fname">Allowed paths (one per line)</span><textarea id="s_paths" rows="3">' + esc((cfg.safety.allowed_paths || []).join("\n")) + "</textarea></label>" +
+        '<label class="field"><span class="fname">Blocked commands (one per line)</span><textarea id="s_blocked" rows="3">' + esc((cfg.safety.blocked_commands || []).join("\n")) + "</textarea></label>" +
+        '<div class="section-h">Scheduler</div>' +
+        '<label class="check"><input type="checkbox" id="s_sched"' + (cfg.scheduler.enabled ? " checked" : "") + "> Scheduler enabled</label>" +
+        '<label class="field"><span class="fname">Check interval (seconds)</span><input type="number" id="s_interval" min="1" value="' + cfg.scheduler.check_interval_seconds + '"></label>' +
+        '<div class="section-h">Network</div>' +
+        '<div style="display:flex;gap:0.7rem">' +
+          '<label class="field" style="flex:2"><span class="fname">GUI host (127.0.0.1 = this PC only · 0.0.0.0 = whole LAN)</span><input type="text" id="n_host" value="' + esc((cfg.network && cfg.network.gui_host) || "127.0.0.1") + '"></label>' +
+          '<label class="field" style="flex:1"><span class="fname">GUI port</span><input type="number" id="n_port" value="' + ((cfg.network && cfg.network.gui_port) || 8080) + '"></label>' +
+        "</div>" +
+        '<label class="check"><input type="checkbox" id="n_disc"' + ((cfg.network ? cfg.network.discovery_enabled : true) ? " checked" : "") + "> LAN peer discovery enabled</label>" +
+        '<div style="font-size:0.7rem;color:var(--dim);margin:-0.2rem 0 0.6rem">Host/port changes take effect on next restart. 0.0.0.0 lets other machines send this one tasks — use only on a trusted network.</div>' +
+        '<div class="section-h">Memory</div>' +
+        '<div style="display:flex;gap:0.7rem">' +
+          '<label class="field" style="flex:1"><span class="fname">Mode</span><select id="m_mode">' +
+            '<option value="local"' + ((cfg.memory && cfg.memory.mode==="local") ? " selected":"") + ">local (this machine)</option>" +
+            '<option value="shared"' + ((cfg.memory && cfg.memory.mode==="shared") ? " selected":"") + ">shared (fleet-wide)</option>" +
+          "</select></label>" +
+          '<label class="field" style="flex:2"><span class="fname">Hub URL (blank = this machine IS the hub)</span><input type="text" id="m_hub" value="' + esc((cfg.memory && cfg.memory.hub_url) || "") + '" placeholder="http://192.168.86.250:8080"></label>' +
+        "</div>" +
+        '<label class="check"><input type="checkbox" id="m_sem"' + ((cfg.memory ? cfg.memory.semantic : true) ? " checked" : "") + "> Semantic recall (rank by meaning, not keywords)</label>" +
+        '<label class="field"><span class="fname">Embedding model</span><input type="text" id="m_emb" value="' + esc((cfg.memory && cfg.memory.embed_model) || "nomic-embed-text") + '"></label>' +
+        '<div style="font-size:0.7rem;color:var(--dim);margin:-0.2rem 0 0.6rem">Shared mode: every machine points hub_url at the always-on box; the hub leaves it blank. Needs the embedding model pulled in Ollama.</div>' +
+        '<div class="section-h">Autonomy</div>' +
+        '<label class="check"><input type="checkbox" id="s_auto"' + (cfg.autonomy.enabled ? " checked" : "") + "> Autonomy enabled</label>" +
+        '<label class="check"><input type="checkbox" id="s_reflect"' + (cfg.autonomy.reflection_enabled ? " checked" : "") + "> Reflection on failure</label>" +
+        '<label class="field"><span class="fname">Max iterations</span><input type="number" id="s_iters" min="1" value="' + cfg.autonomy.max_iterations + '"></label>' +
+        '<div style="margin-top:1.1rem;display:flex;gap:0.6rem;align-items:center">' +
+          '<button class="btn" id="s_save">SAVE &amp; APPLY</button>' +
+          '<span style="font-size:0.7rem;color:var(--dim)">Applies live and writes config\\jarvis.yaml (memory DB changes need a restart)</span>' +
+        "</div>";
+      $("#p_preset", body).onchange = () => {
+        const p = PRESETS[$("#p_preset", body).value];
+        if (p) { $("#p_name", body).value = p.name; $("#p_persona", body).value = p.persona; }
+      };
+      $("#s_save", body).onclick = async () => {
+        const btn = $("#s_save", body);
+        btn.disabled = true; setBusy(true, "APPLYING");
+        const payload = {
+          personality: {
+            enabled: $("#p_enabled", body).checked,
+            name: $("#p_name", body).value.trim() || "Jarvis",
+            persona: $("#p_persona", body).value.trim(),
+          },
+          llm: {
+            provider: $("#s_provider", body).value,
+            model: $("#s_model", body).value.trim(),
+            api_key: $("#s_key", body).value.trim(),
+            base_url: $("#s_url", body).value.trim() || null,
+            temperature: parseFloat($("#s_temp", body).value) || 0.3,
+            max_tokens: parseInt($("#s_maxtok", body).value) || 4096,
+          },
+          safety: {
+            permissive: $("#s_permissive", body).checked,
+            allow_sudo: $("#s_sudo", body).checked,
+            allow_network: $("#s_net", body).checked,
+            allowed_paths: $("#s_paths", body).value.split("\n").map(s => s.trim()).filter(Boolean),
+            blocked_commands: $("#s_blocked", body).value.split("\n").map(s => s.trim()).filter(Boolean),
+          },
+          scheduler: {
+            enabled: $("#s_sched", body).checked,
+            check_interval_seconds: parseInt($("#s_interval", body).value) || 1,
+          },
+          autonomy: {
+            enabled: $("#s_auto", body).checked,
+            reflection_enabled: $("#s_reflect", body).checked,
+            max_iterations: parseInt($("#s_iters", body).value) || 50,
+          },
+          network: {
+            gui_host: $("#n_host", body).value.trim() || "127.0.0.1",
+            gui_port: parseInt($("#n_port", body).value) || 8080,
+            discovery_enabled: $("#n_disc", body).checked,
+          },
+          memory: {
+            mode: $("#m_mode", body).value,
+            hub_url: $("#m_hub", body).value.trim() || null,
+            embed_model: $("#m_emb", body).value.trim() || "nomic-embed-text",
+            semantic: $("#m_sem", body).checked,
+          },
+        };
+        try {
+          const res = await api("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+          toast(res.message || "Settings applied.", "success");
+          refreshTrayModel();
+        } catch (err) {
+          toast("Settings rejected: " + err.message, "error");
+        } finally { btn.disabled = false; setBusy(false); }
+      };
+    }
+  }
+};
+
+/* ---- Files ---- */
+APPS.files = {
+  name: "Files", glyph: "🗀", w: 620, h: 480,
+  init(body) {
+    body.innerHTML =
+      '<div class="file-toolbar">' +
+        '<button class="btn ghost up" title="Up">↑</button>' +
+        '<input type="text" class="pathbox" spellcheck="false">' +
+        '<button class="btn ghost go">GO</button>' +
+      '</div><div class="flist"></div>';
+    const pathbox = $(".pathbox", body), flist = $(".flist", body);
+    let parent = null;
+    async function load(p) {
+      flist.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const data = await api("/api/files?path=" + encodeURIComponent(p || ""));
+        pathbox.value = data.path; parent = data.parent;
+        if (!data.entries.length) { flist.innerHTML = '<div class="empty">Empty directory.</div>'; return; }
+        flist.innerHTML = "";
+        data.entries.forEach(e => {
+          const row = document.createElement("div");
+          row.className = "fentry";
+          row.innerHTML = "<span>" + (e.is_dir ? "📁" : "📄") + "</span><span>" + esc(e.name) + "</span>" +
+            (e.is_dir ? "" : '<span class="fsize">' + fmtBytes(e.size) + "</span>");
+          row.onclick = () => {
+            const full = data.path.replace(/[\\/]+$/, "") + "\\" + e.name;
+            if (e.is_dir) load(full);
+            else createWindow(APPS.editor, { title: "Edit — " + e.name, path: full });
+          };
+          flist.appendChild(row);
+        });
+      } catch (err) { flist.innerHTML = '<div class="card error"><h4>Error</h4><pre>' + esc(err.message) + "</pre></div>"; }
+    }
+    $(".go", body).onclick = () => load(pathbox.value.trim());
+    pathbox.addEventListener("keydown", e => { if (e.key === "Enter") load(pathbox.value.trim()); });
+    $(".up", body).onclick = () => { if (parent) load(parent); };
+    load("");
+  }
+};
+
+/* ---- Voice (Alpha hands-free listener) ---- */
+APPS.voice = {
+  name: "Voice", glyph: "🎙", w: 420, h: 480,
+  init(body, win) {
+    body.innerHTML = '<div class="empty">Loading voice settings…</div>';
+    let settings = {}, personas = [];
+    async function load() {
+      try {
+        const data = await api("/api/voice/settings");
+        settings = data.settings || {};
+        personas = data.personas || [];
+        render();
+      } catch (err) { body.innerHTML = '<div class="card error"><h4>Error</h4><pre>' + esc(err.message) + "</pre></div>"; }
+    }
+    function render() {
+      const opts = personas.map(p => '<option value="' + esc(p.id) + '"' + (settings.persona_id === p.id ? " selected" : "") + '>' + esc(p.name + " — " + p.role) + "</option>").join("");
+      const status = settings.enabled ? (settings.always_listening ? "listening" : "ready") : "off";
+      const dotColor = status === "listening" ? "var(--success)" : status === "ready" ? "var(--accent)" : "var(--error)";
+      body.innerHTML =
+        '<div class="section-h">Alpha Voice</div>' +
+        '<div class="card" style="margin-bottom:0.6rem;border-left-color:' + dotColor + '">' +
+          '<h4 style="display:flex;align-items:center;gap:0.5rem"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + dotColor + ';box-shadow:0 0 8px ' + dotColor + '"></span>' +
+          esc(status === "listening" ? "Listener active" : status === "ready" ? "Voice ready" : "Voice off") + "</h4>" +
+          '<p style="margin:0.3rem 0;font-size:0.78rem;color:var(--dim)">Say <strong>"Alpha"</strong> or <strong>"okay Alpha"</strong> to wake the CEO persona.</p>' +
+        '</div>' +
+        '<label class="check"><input type="checkbox" id="v_enabled"' + (settings.enabled ? " checked" : "") + '> Enable voice features</label>' +
+        '<label class="check"><input type="checkbox" id="v_output"' + (settings.output_enabled ? " checked" : "") + '> Voice output (TTS)</label>' +
+        '<label class="check"><input type="checkbox" id="v_listen"' + (settings.always_listening ? " checked" : "") + '> Always listening (wake-word)</label>' +
+        '<label class="field"><span class="fname">Voice persona</span><select id="v_persona">' + opts + '</select></label>' +
+        '<label class="field"><span class="fname">Wake word</span><input type="text" id="v_wake" value="' + esc(settings.wake_word || "Alpha") + '"></label>' +
+        '<div style="display:flex;gap:0.5rem;margin-top:0.8rem">' +
+          '<button class="btn" id="v_save">SAVE & APPLY</button>' +
+          '<button class="btn ghost" id="v_test">TEST SPEAK</button>' +
+        '</div>' +
+        '<div class="section-h" style="margin-top:1rem">Manual control</div>' +
+        '<div style="display:flex;gap:0.5rem">' +
+          '<button class="btn ghost" id="v_start">START LISTENER</button>' +
+          '<button class="btn ghost" id="v_stop">STOP LISTENER</button>' +
+        '</div>';
+      $("#v_save", body).onclick = async () => {
+        $("#v_save", body).disabled = true; setBusy(true, "VOICE");
+        try {
+          const payload = {
+            enabled: $("#v_enabled", body).checked,
+            output_enabled: $("#v_output", body).checked,
+            always_listening: $("#v_listen", body).checked,
+            persona_id: $("#v_persona", body).value,
+            wake_word: $("#v_wake", body).value.trim() || "Alpha",
+          };
+          const data = await api("/api/voice/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+          settings = data.settings;
+          render();
+          toast("Voice settings applied", "success");
+        } catch (err) { toast(err.message, "error"); }
+        finally { setBusy(false); $("#v_save", body).disabled = false; }
+      };
+      $("#v_test", body).onclick = () => api("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ goal: "Say exactly: Alpha voice online", agent: "simple" }) }).then(() => toast("Test spoken", "success")).catch(e => toast(e.message, "error"));
+      $("#v_start", body).onclick = async () => { const d = await api("/api/voice/start", { method: "POST" }); settings.always_listening = true; render(); toast(d.status || "started", d.status === "error" ? "error" : "success"); };
+      $("#v_stop", body).onclick = async () => { const d = await api("/api/voice/stop", { method: "POST" }); settings.always_listening = false; render(); toast(d.status || "stopped", d.status === "error" ? "error" : "success"); };
+    }
+    load();
+  }
+};
+
+/* ---- Editor (opened from Files) ---- */
+APPS.editor = {
+  name: "Editor", glyph: "✎", w: 700, h: 520,
+  init(body, win, opts) {
+    body.innerHTML =
+      '<div class="editor-wrap">' +
+        '<div class="editor-bar"><span class="path">' + esc(opts.path) + '</span><button class="btn save">SAVE</button></div>' +
+        '<textarea spellcheck="false" disabled>Loading…</textarea>' +
+      "</div>";
+    const ta = $("textarea", body), save = $(".save", body);
+    api("/api/file?path=" + encodeURIComponent(opts.path))
+      .then(d => { ta.value = d.content; ta.disabled = false; })
+      .catch(err => { ta.value = "ERROR: " + err.message; });
+    save.onclick = async () => {
+      save.disabled = true;
+      try {
+        await api("/api/file", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: opts.path, content: ta.value }) });
+        toast("Saved " + opts.path, "success");
+      } catch (err) { toast("Save failed: " + err.message, "error"); }
+      finally { save.disabled = false; }
+    };
+  }
+};
+
+/* ---- System Monitor ---- */
+APPS.monitor = {
+  name: "System Monitor", glyph: "▦", w: 460, h: 460,
+  init(body, win) {
+    body.innerHTML = '<div class="mon"></div>';
+    const mon = $(".mon", body);
+    async function tick() {
+      try {
+        const s = await api("/api/system");
+        const bar = (label, pct, extra) =>
+          '<div class="bar-row"><div class="bar-label"><span>' + label + "</span><span>" + (extra || pct + "%") + '</span></div>' +
+          '<div class="bar' + (pct > 85 ? " hot" : "") + '"><div style="width:' + pct + '%"></div></div></div>';
+        mon.innerHTML =
+          bar("CPU (" + (s.cpu_count || "?") + " cores)", Math.round(s.cpu_percent || 0)) +
+          bar("MEMORY", Math.round(s.mem_percent || 0), fmtBytes(s.mem_used) + " / " + fmtBytes(s.mem_total)) +
+          bar("DISK", Math.round(s.disk_percent || 0), fmtBytes(s.disk_used) + " / " + fmtBytes(s.disk_total)) +
+          '<div class="section-h">System</div><div class="kv">' +
+          '<span class="k">HOST</span><span class="v">' + esc(s.hostname) + "</span>" +
+          '<span class="k">OS</span><span class="v">' + esc(s.platform) + "</span>" +
+          '<span class="k">PYTHON</span><span class="v">' + esc(s.python) + "</span>" +
+          '<span class="k">PROCESSES</span><span class="v">' + esc(String(s.process_count || "?")) + "</span>" +
+          '<span class="k">UPTIME</span><span class="v">' + (s.uptime_seconds ? fmtUptime(s.uptime_seconds) : "?") + "</span>" +
+          '<span class="k">LLM</span><span class="v">' + esc(s.provider + " / " + s.model) + "</span>" +
+          '<span class="k">SAFETY</span><span class="v" style="color:' + (s.permissive ? "var(--warn)" : "var(--success)") + '">' + (s.permissive ? "PERMISSIVE" : "POLICY ENFORCED") + "</span>" +
+          "</div>";
+      } catch (err) { mon.innerHTML = '<div class="card error"><h4>Error</h4><pre>' + esc(err.message) + "</pre></div>"; }
+    }
+    tick();
+    const timer = setInterval(tick, 3000);
+    windows.get(win.id).onClose = () => clearInterval(timer);
+  }
+};
+
+/* ---- Memory ---- */
+APPS.memory = {
+  name: "Memory Log", glyph: "◈", w: 540, h: 440,
+  init(body, win) {
+    body.innerHTML = '<div style="margin-bottom:0.6rem"><button class="btn ghost rf">REFRESH</button></div><div class="list"></div>';
+    const list = $(".list", body);
+    async function load() {
+      try {
+        const msgs = await api("/memory");
+        list.innerHTML = msgs.length ? msgs.slice().reverse().map(m =>
+          '<div class="entry"><div class="meta"><span class="timestamp">' + esc(m.timestamp) + '</span><span class="role">' + esc(m.role) + '</span></div><div>' + esc(m.content) + "</div></div>"
+        ).join("") : '<div class="empty">No memory entries.</div>';
+      } catch (err) { list.innerHTML = '<div class="card error"><h4>Error</h4><pre>' + esc(err.message) + "</pre></div>"; }
+    }
+    $(".rf", body).onclick = load;
+    load();
+    const timer = setInterval(load, 10000);
+    windows.get(win.id).onClose = () => clearInterval(timer);
+  }
+};
+
+/* ---- Audit ---- */
+APPS.audit = {
+  name: "Audit Log", glyph: "☰", w: 640, h: 440,
+  init(body, win) {
+    body.innerHTML = '<div style="margin-bottom:0.6rem"><button class="btn ghost rf">REFRESH</button></div><div class="list"></div>';
+    const list = $(".list", body);
+    async function load() {
+      try {
+        const lines = await api("/audit");
+        list.innerHTML = lines.length ? lines.slice().reverse().map(l => '<div class="log-line">' + esc(l) + "</div>").join("") : '<div class="empty">No audit entries.</div>';
+      } catch (err) { list.innerHTML = '<div class="card error"><h4>Error</h4><pre>' + esc(err.message) + "</pre></div>"; }
+    }
+    $(".rf", body).onclick = load;
+    load();
+    const timer = setInterval(load, 10000);
+    windows.get(win.id).onClose = () => clearInterval(timer);
+  }
+};
+
+/* ---- Skills ---- */
+APPS.skills = {
+  name: "Skills", glyph: "❖", w: 520, h: 460,
+  init(body) {
+    body.innerHTML = '<div class="empty">Loading skills…</div>';
+    api("/api/skills").then(skills => {
+      body.innerHTML = skills.map(s =>
+        '<div class="card"><h4>' + esc(s.name) + "</h4><pre>" + esc(s.description) + "</pre></div>"
+      ).join("") || '<div class="empty">No skills registered.</div>';
+    }).catch(err => { body.innerHTML = '<div class="card error"><h4>Error</h4><pre>' + esc(err.message) + "</pre></div>"; });
+  }
+};
+
+/* ---- Network (peer discovery + delegation) ---- */
+APPS.network = {
+  name: "Network", glyph: "⧉", w: 620, h: 500,
+  init(body, win) {
+    body.innerHTML =
+      '<div style="margin-bottom:0.7rem;display:flex;gap:0.5rem;align-items:center">' +
+        '<button class="btn ghost rf">REFRESH</button>' +
+        '<span style="font-size:0.7rem;color:var(--dim)">Other Jarvis instances broadcasting on this LAN</span>' +
+      '</div>' +
+      '<div class="section-h">Delegate a task</div>' +
+      '<textarea class="dgoal" rows="2" placeholder="Goal to run on another machine..."></textarea>' +
+      '<div class="console-row" style="margin:0.5rem 0 0.3rem">' +
+        '<button class="btn dbest">RUN ON BEST PEER</button>' +
+        '<select class="dagent"><option value="simple">SIMPLE</option><option value="react">REACT</option>' +
+        '<option value="codeact">CODEACT</option><option value="autonomous">AUTONOMOUS</option></select>' +
+        '<span style="font-size:0.7rem;color:var(--dim)">auto-picks the least-loaded peer</span>' +
+      '</div>' +
+      '<div class="dresult"></div>' +
+      '<div class="section-h">This machine</div><div class="selfbox"></div>' +
+      '<div class="section-h">Discovered peers</div><div class="peerbox"></div>';
+    const peerbox = $(".peerbox", body), selfbox = $(".selfbox", body), dresult = $(".dresult", body);
+    async function load() {
+      try {
+        const data = await api("/api/peers");
+        const s = data.self;
+        selfbox.innerHTML = '<div class="card success"><h4>' + esc(s.name) + " (me)</h4><pre>" +
+          esc(s.ip + ":" + s.gui_port + "  ·  " + s.provider + " / " + s.model) + "</pre></div>";
+        let peersHtml = "";
+        if (!data.peers.length) {
+          peersHtml = '<div class="empty">No other instances found yet. Peers appear within ~5s of coming online (they must run with --host 0.0.0.0 to accept delegated tasks).</div>';
+        } else {
+          peersHtml = data.peers.map(p => {
+            const cpu = p.load && p.load.cpu_percent != null ? Math.round(p.load.cpu_percent) + "% CPU" : "load n/a";
+            const mem = p.load && p.load.mem_percent != null ? Math.round(p.load.mem_percent) + "% MEM" : "";
+            return '<div class="card"><h4>' + esc(p.name) + " · " + esc(p.ip + ":" + (p.gui_port || "?")) + "</h4><pre>" +
+              esc((p.provider || "?") + " / " + (p.model || "?") + "\n" + cpu + "  " + mem + "   (seen " + p.age + "s ago)") + "</pre>" +
+              (p.url ? '<button class="btn ghost dpeer" data-url="' + esc(p.url) + '" style="margin-top:0.5rem">RUN HERE</button>' : "") +
+              "</div>";
+          }).join("");
+        }
+        const names = [s.name].concat(data.peers.map(p => p.name));
+        const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+        if (dupes.length) {
+          peersHtml = '<div class="card warn"><h4>⚠ Duplicate fleet names detected</h4><p>Multiple nodes are named <strong>' + esc(dupes[0]) + '</strong>. Open <strong>Settings → Personality → Name</strong> on each machine to give them unique names. The new name broadcasts fleet-wide within ~5 seconds.</p></div>' + peersHtml;
+        }
+        peerbox.innerHTML = peersHtml;
+        peerbox.querySelectorAll(".dpeer").forEach(b => b.onclick = () => runDelegate(b.dataset.url));
+      } catch (err) { peerbox.innerHTML = '<div class="card error"><h4>Error</h4><pre>' + esc(err.message) + "</pre></div>"; }
+    }
+    async function runDelegate(peerUrl) {
+      const goal = $(".dgoal", body).value.trim();
+      if (!goal) { toast("Enter a goal to delegate.", "error"); return; }
+      const agent = $(".dagent", body).value;
+      dresult.innerHTML = '<div class="card"><h4>◈ Delegating' + (peerUrl ? " to " + esc(peerUrl) : " to best peer") + '</h4><div class="hunt-stage"></div><pre>' + esc(goal) + '</pre></div>';
+      const dhunt = mountHunt($(".hunt-stage", dresult), peerUrl ? "DELEGATE → " + esc(peerUrl) : "DELEGATE");
+      setBusy(true, "DELEGATING");
+      try {
+        const payload = { goal, agent };
+        if (peerUrl) payload.peer_url = peerUrl;
+        const data = await api("/api/delegate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const r = data.result || {};
+        const text = r.summary || r.answer || JSON.stringify(r).slice(0, 400);
+        await dhunt.settle(true);
+        dresult.innerHTML = '<div class="card success"><h4>✓ Ran on ' + esc(data.delegated_to) + '</h4><pre>' + esc(text) + '</pre></div>';
+      } catch (err) {
+        await dhunt.settle(false);
+        dresult.innerHTML = '<div class="card error"><h4>Delegation failed</h4><pre>' + esc(err.message) + '</pre></div>';
+      } finally { setBusy(false); }
+    }
+    $(".dbest", body).onclick = () => runDelegate(null);
+    $(".rf", body).onclick = load;
+    load();
+    const timer = setInterval(load, 6000);
+    windows.get(win.id).onClose = () => clearInterval(timer);
+  }
+};
+
+/* ---- Cluster (parallel fan-out across the fleet) ---- */
+APPS.cluster = {
+  name: "Cluster", glyph: "⛶", w: 680, h: 560,
+  init(body, win) {
+    body.innerHTML =
+      '<div class="capbar"></div>' +
+      '<div class="section-h">Job Queue (work-stealing)</div>' +
+      '<div class="qstats" style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem"></div>' +
+      '<textarea class="qgoals" rows="3" placeholder="One job per line — dropped into the shared queue; idle nodes pull them automatically"></textarea>' +
+      '<div class="console-row" style="margin:0.5rem 0">' +
+        '<button class="btn qsubmit">SUBMIT TO QUEUE</button>' +
+        '<select class="qagent"><option value="simple">SIMPLE</option><option value="react">REACT</option><option value="codeact">CODEACT</option></select>' +
+        '<span style="font-size:0.7rem;color:var(--dim)">add nodes → queue drains faster</span>' +
+      '</div>' +
+      '<div class="qlist"></div>' +
+      '<div class="section-h">Or: fan-out a batch now (synchronous)</div>' +
+      '<textarea class="cgoals" rows="3" placeholder="One task per line — runs in parallel and returns results here"></textarea>' +
+      '<div class="console-row" style="margin:0.55rem 0">' +
+        '<button class="btn crun">RUN ON CLUSTER</button>' +
+        '<select class="cagent"><option value="simple">SIMPLE</option><option value="react">REACT</option><option value="codeact">CODEACT</option></select>' +
+      '</div>' +
+      '<div class="cresult"></div>';
+    const capbar = $(".capbar", body), cresult = $(".cresult", body);
+    const qstats = $(".qstats", body), qlist = $(".qlist", body);
+    async function loadQueue() {
+      try {
+        const s = await api("/api/jobs/stats");
+        qstats.innerHTML = 'pending <b>' + (s.pending||0) + '</b>  ·  running <b style="color:var(--warn)">' + (s.running||0) +
+          '</b>  ·  done <b style="color:var(--success)">' + (s.done||0) + '</b>' + (s.failed ? '  ·  failed <b style="color:var(--error)">'+s.failed+'</b>' : '');
+        const jobs = await api("/api/jobs/list");
+        qlist.innerHTML = jobs.length ? jobs.slice(0,12).map(j => {
+          const col = j.state==='done'?'var(--success)':j.state==='running'?'var(--warn)':j.state==='failed'?'var(--error)':'var(--dim)';
+          return '<div class="card" style="border-left-color:'+col+'"><h4 style="color:'+col+'">'+esc(j.state.toUpperCase())+
+            (j.worker?' · '+esc(j.worker):'')+(j.took!=null?' · '+j.took+'s':'')+'</h4><pre>'+esc(j.goal)+
+            (j.result_summary?'\n→ '+esc(j.result_summary):'')+(j.error?'\n✗ '+esc(j.error):'')+'</pre></div>';
+        }).join("") : '<div class="empty">Queue is empty.</div>';
+      } catch (err) { qstats.innerHTML = '<span class="error-msg">'+esc(err.message)+'</span>'; }
+    }
+    $(".qsubmit", body).onclick = async () => {
+      const goals = $(".qgoals", body).value.split("\n").map(s=>s.trim()).filter(Boolean);
+      if (!goals.length) { toast("Enter at least one job.","error"); return; }
+      try {
+        const d = await api("/api/jobs/submit", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({goals, agent: $(".qagent",body).value}) });
+        toast((d.submitted?d.submitted.length:goals.length)+" job(s) queued", "success");
+        $(".qgoals", body).value = "";
+        loadQueue();
+      } catch (err) { toast("Submit failed: "+err.message, "error"); }
+    };
+    async function loadCap() {
+      try {
+        const info = await api("/api/cluster/info");
+        capbar.innerHTML = '<div class="card"><h4>Fleet capacity</h4><pre>' +
+          esc(info.node_count + " node(s)  ·  " + info.total_cores + " total cores") + "\n" +
+          info.nodes.map(n => "  " + (n.self ? "★ " : "  ") + n.name + "  " + (n.ip||"") + "  " +
+            (n.cores!=null ? n.cores+" cores" : "") + (n.cpu_percent!=null ? "  "+Math.round(n.cpu_percent)+"% cpu" : "") +
+            (n.self ? "" : (n.reachable ? "  ✓reachable" : "  ✗unreachable"))).join("\n") +
+          "</pre></div>";
+      } catch (err) { capbar.innerHTML = '<div class="card error"><h4>Error</h4><pre>' + esc(err.message) + "</pre></div>"; }
+    }
+    $(".crun", body).onclick = async () => {
+      const goals = $(".cgoals", body).value.split("\n").map(s => s.trim()).filter(Boolean);
+      if (!goals.length) { toast("Enter at least one task.", "error"); return; }
+      const agent = $(".cagent", body).value;
+      cresult.innerHTML = '<div class="card"><h4>◈ On the hunt · ' + goals.length + ' task(s) across the fleet…</h4><div class="hunt-stage"></div></div>';
+      const chunt = mountHunt($(".hunt-stage", cresult), "FLEET ×" + goals.length);
+      setBusy(true, "CLUSTER");
+      try {
+        const d = await api("/api/cluster/map", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ goals, agent }) });
+        await chunt.settle(true);
+        let html = '<div class="card success"><h4>Done — ' + d.tasks + ' tasks on ' + d.nodes_used + ' node(s)</h4><pre>' +
+          esc("wall time: " + d.wall_seconds + "s   (serial would be ~" + d.serial_seconds + "s)   speedup: " + d.speedup + "×") + "</pre></div>";
+        d.results.forEach(r => {
+          html += '<div class="card ' + (r.ok ? "" : "error") + '"><h4>' + esc(r.node) + "  ·  " + r.seconds + 's</h4><pre>' +
+            esc(r.goal) + "\n→ " + esc(r.ok ? r.summary : r.error) + "</pre></div>";
+        });
+        cresult.innerHTML = html;
+      } catch (err) {
+        await chunt.settle(false);
+        cresult.innerHTML = '<div class="card error"><h4>Cluster run failed</h4><pre>' + esc(err.message) + "</pre></div>";
+      } finally { setBusy(false); loadCap(); }
+    };
+    loadCap(); loadQueue();
+    const timer = setInterval(() => { loadCap(); loadQueue(); }, 3000);
+    windows.get(win.id).onClose = () => clearInterval(timer);
+  }
+};
+
+/* ---- Fleet Console (node status board + remote control) ---- */
+APPS.fleet = {
+  name: "Fleet Console", glyph: "🖧", w: 760, h: 640,
+  init(body, win) {
+    body.innerHTML =
+      '<div class="section-h">Fleet Status</div>' +
+      '<div class="nodeboard" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:0.6rem;margin-bottom:0.4rem"></div>' +
+      '<div class="section-h">Remote Output</div>' +
+      '<div class="fout" style="border:1px solid var(--border);border-radius:0.6rem;background:rgba(3,7,18,0.55);padding:0.7rem;height:160px;overflow-y:auto;margin-bottom:0.5rem;font-size:0.8rem"><div class="empty">Click a node action above to see results here.</div></div>' +
+      '<div class="section-h">Fleet-wide Actions</div>' +
+      '<label class="field" style="margin-bottom:0.5rem"><span class="fname">Code source (share, git URL, or path)</span><input type="text" class="fsrc" value="\\\\CASHMONEY\\Public\\JarvisOS"></label>' +
+      '<div class="console-row" style="margin-bottom:0.5rem;flex-wrap:wrap">' +
+        '<button class="btn synccfg">SYNC CONFIG TO FLEET</button>' +
+        '<button class="btn ghost updatecode">UPDATE CODE ON FLEET</button>' +
+        '<label class="check"><input type="checkbox" class="restartup"> Restart nodes after code update</label>' +
+      '</div>' +
+      '<div class="section-h">Talk to a node</div>' +
+      '<div class="console-row" style="margin-bottom:0.5rem">' +
+        '<select class="fnode" style="flex:1"></select>' +
+        '<select class="fagent" style="width:130px"><option value="simple">SIMPLE</option><option value="react">REACT</option><option value="codeact">CODEACT</option></select>' +
+      '</div>' +
+      '<div class="fchat" style="border:1px solid var(--border);border-radius:0.6rem;background:rgba(3,7,18,0.55);padding:0.7rem;height:160px;overflow-y:auto;margin-bottom:0.5rem;font-size:0.82rem"></div>' +
+      '<div class="console-row" style="margin-bottom:0.5rem">' +
+        '<input type="text" class="fmsg" placeholder="Message this node..." style="flex:1">' +
+        '<button class="btn fsend">SEND</button>' +
+      '</div>' +
+      '<div class="console-row">' +
+        '<input type="text" class="fcmd" placeholder="Run command on selected node..." style="flex:1">' +
+        '<button class="btn ghost fcmdrun">RUN CMD</button>' +
+      '</div>';
+    const board = $(".nodeboard", body), nodeSel = $(".fnode", body), chat = $(".fchat", body), fout = $(".fout", body);
+    const convos = {};
+    let nodes = [];
+    let token = "";
+
+    function dot(state){ const c = state==='self'?'var(--accent)':state==='online'?'var(--success)':'var(--error)';
+      return '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+c+';box-shadow:0 0 8px '+c+'"></span>'; }
+
+    async function loadToken() {
+      try {
+        const cfg = await api("/api/config");
+        token = (cfg.network && cfg.network.delegation_token) || "";
+      } catch (err) { token = ""; }
+    }
+    function nodeUrl(n) {
+      if (n.self) return location.origin;
+      return n.url || ("http://"+n.ip+":"+(n.gui_port||8080));
+    }
+    function showOut(title, data, isError) {
+      fout.innerHTML = '<div class="card '+(isError?'error':'')+'" style="margin:0"><h4>'+esc(title)+'</h4><pre>'+esc(typeof data==='string'?data:JSON.stringify(data,null,2))+'</pre></div>';
+    }
+    async function fleetReq(method, peerUrl, path, payload) {
+      const headers = {"Content-Type":"application/json"};
+      if (token) headers["Authorization"] = "Bearer "+token;
+      const opts = {method, headers};
+      if (payload) opts.body = JSON.stringify(payload);
+      const url = peerUrl.replace(/\/+$/, "") + path;
+      const r = await fetch(url, opts);
+      if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || ("HTTP "+r.status));
+      return await r.json();
+    }
+
+    async function loadBoard() {
+      try {
+        const info = await api("/api/cluster/info");
+        nodes = info.nodes;
+        board.innerHTML = info.nodes.map((n, idx) => {
+          const state = n.self ? 'self' : (n.reachable ? 'online' : 'offline');
+          const cpu = n.cpu_percent!=null ? Math.round(n.cpu_percent)+'%' : '—';
+          const url = nodeUrl(n);
+          return '<div class="card" style="margin:0;border-left-color:'+(n.self?'var(--accent)':n.reachable?'var(--success)':'var(--error)')+'">'+
+            '<h4 style="display:flex;align-items:center;gap:0.4rem">'+dot(state)+esc(n.name)+(n.self?' (me)':'')+'</h4>'+
+            '<pre>'+esc((n.ip||'?'))+'\n'+esc((n.model||'?'))+'\n'+(n.cores!=null?n.cores+' cores':'')+'   cpu '+cpu+'\n'+
+            (n.self?'coordinator':(n.reachable?'reachable':'unreachable'))+'</pre>'+
+            '<div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.5rem">'+
+              '<button class="btn ghost small fh" data-idx="'+idx+'">Health</button>'+
+              '<button class="btn ghost small fs" data-idx="'+idx+'">System</button>'+
+              '<button class="btn ghost small fa" data-idx="'+idx+'">Audit</button>'+
+              '<button class="btn ghost small fr" data-idx="'+idx+'">Restart</button>'+
+            '</div></div>';
+        }).join("");
+        board.querySelectorAll(".fh").forEach(b => b.onclick = () => doHealth(nodes[+b.dataset.idx]));
+        board.querySelectorAll(".fs").forEach(b => b.onclick = () => doSystem(nodes[+b.dataset.idx]));
+        board.querySelectorAll(".fa").forEach(b => b.onclick = () => doAudit(nodes[+b.dataset.idx]));
+        board.querySelectorAll(".fr").forEach(b => b.onclick = () => doRestart(nodes[+b.dataset.idx]));
+
+        const cur = nodeSel.value;
+        const opts = info.nodes.filter(n=>n.self||n.reachable).map(n =>
+          '<option value="'+esc(n.self?'__self__':n.ip)+'">'+esc(n.name)+' — '+esc(n.ip||'')+(n.self?' (me)':'')+'</option>').join("");
+        nodeSel.innerHTML = opts;
+        if (cur) nodeSel.value = cur;
+      } catch(err){ board.innerHTML = '<div class="card error"><h4>Error</h4><pre>'+esc(err.message)+'</pre></div>'; }
+    }
+
+    async function doHealth(n) {
+      setBusy(true, "FLEET");
+      try { const d = await fleetReq("GET", nodeUrl(n), "/api/fleet/health"); showOut("Health — "+n.name, d); }
+      catch(e){ showOut("Health — "+n.name, e.message, true); }
+      finally { setBusy(false); }
+    }
+    async function doSystem(n) {
+      setBusy(true, "FLEET");
+      try { const d = await fleetReq("GET", nodeUrl(n), "/api/fleet/system"); showOut("System — "+n.name, d); }
+      catch(e){ showOut("System — "+n.name, e.message, true); }
+      finally { setBusy(false); }
+    }
+    async function doAudit(n) {
+      setBusy(true, "FLEET");
+      try { const d = await fleetReq("GET", nodeUrl(n), "/api/fleet/audit"); showOut("Audit — "+n.name, d); }
+      catch(e){ showOut("Audit — "+n.name, e.message, true); }
+      finally { setBusy(false); }
+    }
+    async function doRestart(n) {
+      if (!confirm("Restart node "+n.name+" ("+n.ip+")?")) return;
+      setBusy(true, "FLEET");
+      try { const d = await fleetReq("POST", nodeUrl(n), "/api/fleet/restart"); showOut("Restart — "+n.name, d); }
+      catch(e){ showOut("Restart — "+n.name, e.message, true); }
+      finally { setBusy(false); }
+    }
+
+    function renderChat() {
+      const key = nodeSel.value || '__self__';
+      const log = convos[key] || [];
+      chat.innerHTML = log.length ? log.map(m =>
+        '<div style="margin-bottom:0.5rem"><span style="color:'+(m.role==='you'?'var(--accent)':'var(--success)')+';font-weight:700">'+m.role+':</span> '+esc(m.text)+'</div>'
+      ).join("") : '<div class="empty">No messages with this node yet.</div>';
+      chat.scrollTop = chat.scrollHeight;
+    }
+    nodeSel.onchange = renderChat;
+    async function send() {
+      const msg = $(".fmsg", body).value.trim(); if (!msg) return;
+      const key = nodeSel.value || '__self__';
+      const agent = $(".fagent", body).value;
+      convos[key] = convos[key] || [];
+      convos[key].push({role:'you', text:msg});
+      $(".fmsg", body).value = "";
+      convos[key].push({role:'…', text:'thinking'}); renderChat();
+      setBusy(true, "FLEET");
+      try {
+        let data;
+        if (key === '__self__') {
+          data = await api("/goal", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal:msg,agent})});
+        } else {
+          const n = nodes.find(n=>n.ip===key);
+          data = await fleetReq("POST", nodeUrl(n), "/api/fleet/goal", {goal:msg, agent});
+        }
+        convos[key].pop();
+        const nm = nodes.find(n=>(key==='__self__'?n.self:n.ip===key));
+        convos[key].push({role:(nm?nm.name:'node'), text:(data.summary||data.answer||JSON.stringify(data).slice(0,300))});
+      } catch(err) {
+        convos[key].pop();
+        convos[key].push({role:'error', text:err.message});
+      } finally { setBusy(false); renderChat(); }
+    }
+    async function runCmd() {
+      const cmd = $(".fcmd", body).value.trim(); if (!cmd) return;
+      const key = nodeSel.value || '__self__';
+      if (key === '__self__') { toast("Select a remote node to run commands on.", "error"); return; }
+      const n = nodes.find(n=>n.ip===key);
+      setBusy(true, "FLEET");
+      try {
+        const d = await fleetReq("POST", nodeUrl(n), "/api/fleet/command", {command: cmd, timeout: 30});
+        showOut("Command on "+n.name, d);
+        $(".fcmd", body).value = "";
+      } catch(e) { showOut("Command on "+n.name, e.message, true); }
+      finally { setBusy(false); }
+    }
+    async function syncConfigToFleet() {
+      if (!confirm("Push this node's config to all discovered peers?\nExisting API keys on peers will be preserved if not provided.")) return;
+      setBusy(true, "FLEET");
+      try {
+        const data = await api("/goal", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal:"Sync my config to the entire fleet using fleet.sync_config", agent:"simple"})});
+        showOut("Sync Config to Fleet", data);
+      } catch(e) { showOut("Sync Config to Fleet", e.message, true); }
+      finally { setBusy(false); }
+    }
+    async function updateCodeOnFleet() {
+      const restart = $(".restartup", body).checked;
+      const source = $(".fsrc", body).value.trim() || "\\\\CASHMONEY\\Public\\JarvisOS";
+      if (!confirm("Update code on all discovered peers from\n"+source+(restart?"\n\nThen restart each node.":""))) return;
+      setBusy(true, "FLEET");
+      try {
+        const goal = `Update code on the entire fleet using fleet.update_code with source="${source}" and restart_after_update=${restart}`;
+        const data = await api("/goal", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal, agent:"simple"})});
+        showOut("Update Code on Fleet", data);
+      } catch(e) { showOut("Update Code on Fleet", e.message, true); }
+      finally { setBusy(false); }
+    }
+    $(".synccfg", body).onclick = syncConfigToFleet;
+    $(".updatecode", body).onclick = updateCodeOnFleet;
+    $(".fsend", body).onclick = send;
+    $(".fmsg", body).addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); send(); }});
+    $(".fcmdrun", body).onclick = runCmd;
+    $(".fcmd", body).addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runCmd(); }});
+    loadToken().then(loadBoard).then(renderChat);
+    const timer = setInterval(loadBoard, 4000);
+    windows.get(win.id).onClose = () => clearInterval(timer);
+  }
+};
+
+/* ---- Netboot Deploy ---- */
+APPS.netboot = {
+  name: "Netboot Deploy", glyph: "⬇", w: 520, h: 560,
+  async init(body, win) {
+    body.innerHTML =
+      '<div class="section-h">Network Boot Deployment</div>' +
+      '<div style="display:flex;gap:0.6rem;margin-bottom:0.8rem">' +
+        '<label class="field" style="flex:1"><span class="fname">Target MAC</span><input type="text" id="nb-mac" placeholder="aa:bb:cc:dd:ee:ff"></label>' +
+        '<label class="field" style="flex:1"><span class="fname">Persona</span><select id="nb-persona"><option value="ledger">ledger</option><option value="ceo">ceo</option><option value="tech">tech</option><option value="marketing">marketing</option><option value="analytics">analytics</option><option value="bizdev">bizdev</option><option value="events">events</option></select></label>' +
+      '</div>' +
+      '<div style="display:flex;gap:0.6rem;margin-bottom:0.8rem">' +
+        '<label class="field" style="flex:1"><span class="fname">Hub ID</span><input type="text" id="nb-hub" placeholder="hub-ledger"></label>' +
+        '<button class="btn primary" id="nb-register" style="align-self:flex-end">Register</button>' +
+      '</div>' +
+      '<div id="nb-status" style="font-size:0.75rem;color:var(--dim);margin-bottom:0.8rem"></div>' +
+      '<div class="section-h">Registered Machines</div>' +
+      '<div id="nb-list" style="overflow:auto;max-height:300px"></div>';
+
+    const macEl = $("#nb-mac", body);
+    const persEl = $("#nb-persona", body);
+    const hubEl = $("#nb-hub", body);
+    const statusEl = $("#nb-status", body);
+    const listEl = $("#nb-list", body);
+
+    const fmtMac = m => m.replace(/[^0-9a-fA-F]/g, "").toLowerCase().replace(/(.{2})/g, "$1:").replace(/:$/, "");
+
+    async function refresh() {
+      try {
+        const status = await api("/api/netboot/status");
+        const reg = await api("/api/netboot/registry");
+        statusEl.textContent = `Hub: ${status.enabled ? "ready" : "disabled"} · Registered: ${status.registered_machines} · Pending: ${status.pending}`;
+        let html = '<table style="width:100%;font-size:0.75rem;border-collapse:collapse">' +
+          '<tr style="text-align:left;border-bottom:1px solid var(--border)"><th>MAC</th><th>Persona</th><th>Hub</th><th>Status</th></tr>';
+        for (const [key, e] of Object.entries(reg)) {
+          if (key.startsWith("__")) continue;
+          html += `<tr><td>${esc(e.mac || key)}</td><td>${esc(e.persona)}</td><td>${esc(e.hub_id)}</td><td>${esc(e.status || "pending")}</td></tr>`;
+        }
+        html += "</table>";
+        listEl.innerHTML = html;
+      } catch (err) {
+        listEl.innerHTML = `<div style="color:var(--warn)">${esc(err.message)}</div>`;
+      }
+    }
+
+    $("#nb-register", body).onclick = async () => {
+      const mac = fmtMac(macEl.value.trim());
+      if (mac.length !== 17) { toast("Invalid MAC address", "error"); return; }
+      const persona = persEl.value;
+      const hub_id = hubEl.value.trim() || `hub-${persona}`;
+      try {
+        const res = await api("/api/netboot/registry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mac, persona, hub_id })
+        });
+        toast(res.ok ? `Registered ${mac}` : (res.error || "failed"), res.ok ? "success" : "error");
+        macEl.value = "";
+        await refresh();
+      } catch (err) { toast(err.message, "error"); }
+    };
+
+    await refresh();
+    const timer = setInterval(refresh, 5000);
+    windows.get(win.id).onClose = () => clearInterval(timer);
+  }
+};
+
+/* ---- USB Builder ---- */
+APPS.usb = {
+  name: "USB Builder", glyph: "💾", w: 560, h: 620,
+  async init(body, win) {
+    body.innerHTML =
+      '<div class="section-h">Bootable Migration USB</div>' +
+      '<div style="font-size:0.75rem;color:var(--dim);margin-bottom:0.8rem">' +
+      'Select a plugged USB device, choose a persona, and click Build. A dry run creates an ISO without erasing anything.</div>' +
+      '<div style="display:flex;gap:0.6rem;margin-bottom:0.8rem">' +
+        '<label class="field" style="flex:2"><span class="fname">USB Device</span><select id="usb-dev"><option value="">— scan for devices —</option></select></label>' +
+        '<button class="btn" id="usb-refresh" style="align-self:flex-end;height:34px">↻</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:0.6rem;margin-bottom:0.8rem">' +
+        '<label class="field" style="flex:1"><span class="fname">Persona</span><select id="usb-persona"><option value="ledger">ledger</option><option value="ceo">ceo</option><option value="tech">tech</option><option value="marketing">marketing</option><option value="analytics">analytics</option><option value="bizdev">bizdev</option><option value="events">events</option></select></label>' +
+        '<label class="field" style="flex:1"><span class="fname">Hub ID</span><input type="text" id="usb-hub" placeholder="hub-ledger"></label>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">' +
+        '<label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--muted)"><input type="checkbox" id="usb-dry"> Dry run (build ISO, do not write)</label>' +
+        '<button class="btn primary" id="usb-build" style="margin-left:auto">Build USB</button>' +
+      '</div>' +
+      '<div class="section-h" style="margin-top:0.8rem">Portable Netboot Hub</div>' +
+      '<div style="font-size:0.75rem;color:var(--dim);margin-bottom:0.8rem">' +
+      'Plug in a Wolfpack USB and turn this machine into a netboot hub. Targets can PXE-boot from it, or you can enable a WiFi hotspot for wireless clients.</div>' +
+      '<div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem">' +
+        '<label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--muted)"><input type="checkbox" id="hub-wifi"> WiFi hotspot</label>' +
+        '<label class="field" style="flex:1;margin-bottom:0"><input type="text" id="hub-ssid" placeholder="Wolfpack-Setup" style="height:30px"></label>' +
+        '<label class="field" style="flex:1;margin-bottom:0"><input type="text" id="hub-psk" placeholder="kingking1007" style="height:30px"></label>' +
+        '<button class="btn" id="hub-deploy" style="margin-left:auto">Deploy Hub</button>' +
+      '</div>' +
+      '<div id="usb-status" style="font-size:0.75rem;color:var(--dim);margin-bottom:0.6rem"></div>' +
+      '<div class="section-h">Build Log</div>' +
+      '<pre id="usb-log" style="flex:1;background:rgba(0,0,0,0.35);border:1px solid var(--border);border-radius:6px;padding:0.6rem;overflow:auto;font-size:0.7rem;margin:0"></pre>';
+
+    const devEl = $("#usb-dev", body);
+    const hubWifiEl = $("#hub-wifi", body);
+    const hubSsidEl = $("#hub-ssid", body);
+    const hubPskEl = $("#hub-psk", body);
+    const persEl = $("#usb-persona", body);
+    const hubEl = $("#usb-hub", body);
+    const dryEl = $("#usb-dry", body);
+    const statusEl = $("#usb-status", body);
+    const logEl = $("#usb-log", body);
+    let activeJob = null;
+    let pollTimer = null;
+
+    async function refreshDevices() {
+      try {
+        const data = await api("/api/usb/devices");
+        const prev = devEl.value;
+        devEl.innerHTML = '<option value="">— select device —</option>' +
+          data.devices.map(d => `<option value="${esc(d.path)}">${esc(d.path)} — ${esc(d.size)}${d.model ? ' — ' + esc(d.model) : ''}</option>`).join("");
+        if (prev && Array.from(devEl.options).some(o => o.value === prev)) devEl.value = prev;
+        statusEl.textContent = `${data.devices.length} removable USB device(s) found.`;
+      } catch (err) {
+        statusEl.textContent = "Could not list devices: " + err.message;
+      }
+    }
+
+    async function pollJob() {
+      if (!activeJob) return;
+      try {
+        const data = await api(`/api/usb/build/status/${activeJob}`);
+        statusEl.textContent = `Job ${activeJob}: ${data.status}${data.dry_run ? ' (dry run)' : ''}`;
+        logEl.textContent = data.log || "Waiting for output...";
+        logEl.scrollTop = logEl.scrollHeight;
+        if (data.status === "done" || data.status === "failed") {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          if (data.status === "done") toast(`USB build complete${data.dry_run ? ' (ISO ready)' : ''}`, "success");
+          else toast("USB build failed: " + (data.error || "see log"), "error");
+        }
+      } catch (err) {
+        statusEl.textContent = "Polling failed: " + err.message;
+      }
+    }
+
+    $("#usb-refresh", body).onclick = refreshDevices;
+
+    $("#usb-build", body).onclick = async () => {
+      const target = devEl.value;
+      if (!target) { toast("Select a USB device first", "error"); return; }
+      if (!dryEl.checked && !confirm(`This will erase ${target}. Continue?`)) return;
+      const persona = persEl.value;
+      const hub_id = hubEl.value.trim() || `hub-${persona}`;
+      try {
+        const res = await api("/api/usb/build", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target, persona, hub_id, dry_run: dryEl.checked })
+        });
+        if (res.ok && res.job_id) {
+          activeJob = res.job_id;
+          logEl.textContent = "";
+          statusEl.textContent = `Job ${activeJob}: running...`;
+          if (pollTimer) clearInterval(pollTimer);
+          pollTimer = setInterval(pollJob, 2000);
+        } else {
+          toast(res.error || "Build failed to start", "error");
+        }
+      } catch (err) { toast(err.message, "error"); }
+    };
+
+    $("#hub-deploy", body).onclick = async () => {
+      if (!confirm("Deploy netboot hub from the Wolfpack USB? This will reconfigure dnsmasq and nginx.")) return;
+      const payload = { wifi: hubWifiEl.checked };
+      if (hubSsidEl.value.trim()) payload.ssid = hubSsidEl.value.trim();
+      if (hubPskEl.value.trim()) payload.psk = hubPskEl.value.trim();
+      try {
+        const res = await api("/api/usb/deploy-hub", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok && res.job_id) {
+          activeJob = res.job_id;
+          logEl.textContent = "";
+          statusEl.textContent = `Job ${activeJob}: running...`;
+          if (pollTimer) clearInterval(pollTimer);
+          pollTimer = setInterval(pollJob, 2000);
+        } else {
+          toast(res.error || "Hub deploy failed to start", "error");
+        }
+      } catch (err) { toast(err.message, "error"); }
+    };
+
+    await refreshDevices();
+    windows.get(win.id).onClose = () => { if (pollTimer) clearInterval(pollTimer); };
+  }
+};
+
+/* =============== desktop, start menu, taskbar =============== */
+const DESKTOP_APPS = ["console", "terminal", "fleet", "netboot", "usb", "settings", "voice", "files", "monitor", "network", "cluster", "memory", "audit", "skills"];
+const desktop = $("#desktop");
+DESKTOP_APPS.forEach(key => {
+  const app = APPS[key];
+  const icon = document.createElement("div");
+  icon.className = "icon";
+  icon.innerHTML = '<div class="glyph">' + app.glyph + '</div><div class="label">' + esc(app.name) + "</div>";
+  icon.title = "Open " + app.name;
+  // Single click opens (web-desktop convention); double-click still works.
+  icon.onclick = () => createWindow(app);
+  desktop.appendChild(icon);
+});
+const startMenu = $("#startMenu");
+startMenu.innerHTML = DESKTOP_APPS.map(key =>
+  '<div class="menu-item" data-app="' + key + '"><span class="glyph">' + APPS[key].glyph + "</span>" + esc(APPS[key].name) + "</div>"
+).join("") + '<div class="menu-sep"></div>' +
+  '<div class="menu-item" data-act="classic"><span class="glyph">◱</span>Classic Dashboard</div>';
+startMenu.addEventListener("click", e => {
+  const item = e.target.closest(".menu-item"); if (!item) return;
+  startMenu.classList.remove("open");
+  if (item.dataset.app) createWindow(APPS[item.dataset.app]);
+  else if (item.dataset.act === "classic") open("/classic", "_blank");
+});
+$("#startBtn").onclick = e => { e.stopPropagation(); startMenu.classList.toggle("open"); };
+document.addEventListener("click", e => { if (!e.target.closest("#startMenu") && !e.target.closest("#startBtn")) startMenu.classList.remove("open"); });
+$("#updateBtn").onclick = async () => {
+  if (!confirm("Update Jarvis OS from the fleet share and restart this node?")) return;
+  try {
+    const res = await api("/api/update_code", { method: "POST" });
+    if (res.ok) {
+      toast(res.note || "Update started — restarting...", "success");
+    } else {
+      toast("Update failed: " + (res.error || "unknown"), "error");
+    }
+  } catch (err) {
+    toast("Update failed: " + err.message, "error");
+  }
+};
+
+function tickClock() {
+  const d = new Date();
+  $("#clock").textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+tickClock(); setInterval(tickClock, 10000);
+
+function refreshTrayModel() {
+  api("/api/system").then(s => { $("#trayModel").textContent = s.provider + " · " + s.model; }).catch(() => {});
+}
+refreshTrayModel();
+
+/* ---- wifi toggle ---- */
+async function refreshWifi() {
+  const btn = $("#wifiBtn");
+  try {
+    const w = await api("/api/wifi");
+    if (!w.available) { btn.style.display = "none"; return; }  // hide on nodes with no Wi-Fi control
+    btn.style.display = "";
+    btn.dataset.enabled = w.enabled ? "1" : "0";
+    btn.classList.toggle("off", !w.enabled);
+    btn.textContent = w.enabled ? ("📶 " + (w.ssid || "WIFI")) : "🚫 WIFI";
+    btn.title = (w.enabled ? ("Wi-Fi: " + (w.ssid || "on")) : "Wi-Fi off") + " · click to choose network";
+  } catch (err) { /* keep last known state */ }
+}
+/* ---- wifi picker menu ---- */
+const wifiMenu = $("#wifiMenu");
+function sigBars(s) { const n = s>=75?4:s>=50?3:s>=25?2:1; let o=""; for (let i=1;i<=4;i++) o += i<=n?"▮":"▯"; return o; }
+async function loadWifiNetworks() {
+  const list = $("#wifiList");
+  list.innerHTML = '<div class="wifi-msg">Scanning…</div>';
+  try {
+    const w = await api("/api/wifi");
+    $("#wifiPower").checked = !!w.enabled;
+    if (!w.enabled) { list.innerHTML = '<div class="wifi-msg">Wi-Fi is off</div>'; return; }
+    const r = await api("/api/wifi/scan");
+    if (!r.available) { list.innerHTML = '<div class="wifi-msg">' + esc(r.reason || "unavailable") + '</div>'; return; }
+    if (!r.networks.length) { list.innerHTML = '<div class="wifi-msg">No networks found</div>'; return; }
+    list.innerHTML = "";
+    r.networks.forEach(n => {
+      const secured = !!(n.security && n.security.trim());
+      const row = document.createElement("div");
+      row.className = "wifi-net" + (n.active ? " active" : "");
+      row.innerHTML = '<span class="sig">' + sigBars(n.signal) + '</span>'
+        + '<span class="nm">' + esc(n.ssid) + '</span>'
+        + (n.active ? '<span class="lock">✓</span>' : '')
+        + (secured ? '<span class="lock">🔒</span>' : '');
+      row.onclick = () => selectWifiNetwork(n, row, secured);
+      list.appendChild(row);
+    });
+  } catch (err) { list.innerHTML = '<div class="wifi-msg" style="color:var(--warn)">' + esc(err.message) + '</div>'; }
+}
+function selectWifiNetwork(n, row, secured) {
+  if (n.active) return;  // already connected
+  document.querySelectorAll(".wifi-pw").forEach(e => e.remove());
+  if (!secured) { doWifiConnect(n.ssid, ""); return; }
+  const box = document.createElement("div");
+  box.className = "wifi-pw";
+  box.innerHTML = '<input type="password" placeholder="Password"><button class="btn">Join</button>';
+  row.after(box);
+  const inp = box.querySelector("input"), btn = box.querySelector("button");
+  inp.focus();
+  const go = () => doWifiConnect(n.ssid, inp.value);
+  btn.onclick = go;
+  inp.onkeydown = e => { if (e.key === "Enter") go(); };
+}
+async function doWifiConnect(ssid, password) {
+  $("#wifiHint").textContent = "Connecting to " + ssid + "…";
+  try {
+    await api("/api/wifi/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ssid, password }) });
+    toast("Connected to " + ssid, "success");
+  } catch (err) { toast("Wi-Fi: " + err.message, "error"); }
+  $("#wifiHint").textContent = "";
+  refreshWifi(); loadWifiNetworks();
+}
+$("#wifiPower").onchange = async e => {
+  try { await api("/api/wifi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: e.target.checked }) }); }
+  catch (err) { toast("Wi-Fi: " + err.message, "error"); }
+  refreshWifi(); setTimeout(loadWifiNetworks, 800);
+};
+$("#wifiRescan").onclick = loadWifiNetworks;
+$("#wifiBtn").onclick = e => {
+  e.stopPropagation();
+  const open = wifiMenu.classList.toggle("open");
+  startMenu.classList.remove("open");
+  if (open) loadWifiNetworks();
+};
+document.addEventListener("click", e => { if (!e.target.closest("#wifiMenu") && !e.target.closest("#wifiBtn")) wifiMenu.classList.remove("open"); });
+refreshWifi(); setInterval(refreshWifi, 15000);
+
+/* =============== boot sequence =============== */
+(function boot() {
+  const msgs = ["INITIALIZING KERNEL", "LOADING SKILL MODULES", "LINKING LLM PROVIDER", "CALIBRATING INTERFACE", "ONLINE"];
+  const fill = $("#bootFill"), msg = $("#bootMsg");
+  let i = 0;
+  const step = () => {
+    if (i < msgs.length) {
+      msg.textContent = msgs[i];
+      fill.style.width = Math.round(((i + 1) / msgs.length) * 100) + "%";
+      i++;
+      setTimeout(step, 260);
+    } else {
+      const b = $("#boot");
+      b.style.opacity = "0";
+      setTimeout(() => { b.remove(); createWindow(APPS.console); }, 600);
+    }
+  };
+  $("#boot").addEventListener("click", () => { i = msgs.length; step(); });
+  step();
+})();
+</script>
+</body>
+</html>

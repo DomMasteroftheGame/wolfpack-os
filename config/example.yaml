@@ -1,0 +1,93 @@
+# Jarvis OS example configuration
+
+llm:
+  provider: kimi          # kimi | anthropic | openai
+  model: kimi-k2-0711-preview
+  api_key: ""             # set your API key here
+  base_url: null          # optional custom endpoint
+  temperature: 0.3
+  max_tokens: 4096
+
+# The agent adopts this persona in its replies. Edit freely or use the
+# preset picker in the desktop Settings app.
+personality:
+  enabled: true
+  # Change this to a unique name per machine (e.g. Jarvis-Desk, Jarvis-Lab, Jarvis-Server)
+  # so you can easily identify fleet nodes in the Network and Fleet Console apps.
+  name: Jarvis
+  persona: "You are Jarvis, a brilliant and unflappable AI butler in the style of Tony Stark's assistant. You are dryly witty, impeccably polite, supremely competent, and quietly confident. Address the user as 'sir'. Keep answers sharp and useful — charm never gets in the way of the actual result."
+
+safety:
+  policy_file: config/policy.yaml
+  audit_file: data/audit.log
+  # WARNING: permissive mode bypasses ALL safety checks.
+  # Only enable in isolated/test environments.
+  permissive: true
+  allow_sudo: false
+  allow_network: false
+  allowed_paths:
+    - "~"
+    - "/tmp"
+  blocked_commands:
+    - "rm -rf /"
+    - "mkfs"
+    - "dd"
+    - ":(){ :|:& };:"
+
+scheduler:
+  enabled: true
+  check_interval_seconds: 1
+
+autonomy:
+  enabled: true
+  max_iterations: 50
+  reflection_enabled: true
+
+network:
+  gui_host: 127.0.0.1     # 0.0.0.0 = reachable from the whole LAN (to receive delegated tasks)
+  gui_port: 8080
+  discovery_enabled: true
+  discovery_port: 47600
+  delegation_token: null  # optional shared secret for cross-instance tasks
+
+# Fleet-shared semantic memory.
+#   mode: local  = this machine only
+#   mode: shared = read/write one fleet-wide memory. On the HUB (the always-on
+#                  box) leave hub_url null; on every other machine set hub_url to
+#                  the hub, e.g. http://192.168.86.250:8080
+memory:
+  mode: local
+  hub_url: null
+  embed_url: null         # ollama base for embeddings; null = use llm.base_url
+  embed_model: nomic-embed-text
+  semantic: true
+
+# Work-stealing cluster. The always-on box is the queue hub (queue_url null,
+# worker_enabled true). Every other node sets queue_url to the hub and turns on
+# worker_enabled — it then pulls jobs whenever it has spare capacity, so adding a
+# node raises throughput instantly.
+cluster:
+  worker_enabled: false
+  queue_url: null
+  max_concurrent: 2
+  poll_interval: 2.0
+
+# Directory containing agentskills.io-compatible skills (the 29 Wolfpack skills live here)
+external_skills_dir: ./skills
+
+# Optional: Google OAuth credentials for Gmail/Calendar connector
+# google_credentials_file: data/google_credentials.json
+# google_client_secrets_file: data/client_secret.json
+
+memory_db: data/memory.db
+log_level: INFO
+
+# Fleet coordination through the shared drive (works past firewalls that block
+# HTTP delegation — every node reaches the NAS share). Set per node:
+share:
+  enabled: false
+  # This node's path to the JarvisOS share:
+  #   Windows: \CASHMONEY\Public\JarvisOS
+  #   Linux:   /mnt/jarvis-share   (mount it first with cifs)
+  path: null
+  poll_interval: 3.0

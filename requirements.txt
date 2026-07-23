@@ -1,0 +1,16 @@
+pyyaml>=6.0
+pydantic>=2.0
+httpx>=0.27
+sqlite-utils>=3.35
+duckduckgo-search>=5.0
+beautifulsoup4>=4.12
+fastapi>=0.111
+uvicorn>=0.30
+psutil>=5.9
+playwright>=1.40      # web_agent browser-automation skill (also run: playwright install chromium)
+speechrecognition>=3.10
+pyaudio>=0.2.14      # microphone input for the voice interface (needs portaudio dev headers on Linux)
+pyttsx3>=2.90
+google-auth-oauthlib>=1.0
+google-auth-httplib2>=0.2
+google-api-python-client>=2.100
