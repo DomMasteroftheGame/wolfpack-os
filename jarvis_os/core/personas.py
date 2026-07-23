@@ -71,7 +71,14 @@ def load_personas(directory: str | Path | None = None) -> dict[str, Persona]:
 
 
 def get_persona(persona_id: str, directory: str | Path | None = None) -> Persona | None:
-    return load_personas(directory).get(persona_id)
+    personas = load_personas(directory)
+    persona = personas.get(persona_id)
+    if persona is None:
+        # Also accept codenames ("ledger" -> finance, "alpha" -> ceo, ...); the
+        # appliance/build pipeline brands peers by codename.
+        lowered = persona_id.lower()
+        persona = next((p for p in personas.values() if p.codename.lower() == lowered), None)
+    return persona
 
 
 def apply_persona(config, persona_id: str, directory: str | Path | None = None):

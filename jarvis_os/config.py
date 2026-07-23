@@ -197,6 +197,8 @@ class VoiceConfig(BaseModel):
     persona_id: str | None = "ceo"    # persona used for voice replies
     wake_word: str = "Alpha"          # "Alpha" / "okay Alpha" maps to the CEO persona
     model: str = "vosk"               # vosk | whisper (future)
+    voice_model: str = "en_US-lessac-medium.onnx"  # piper TTS voice (basename in data/voices)
+    whisper_model: str = "base.en"    # faster-whisper STT model: tiny.en (fast) | base.en (balanced)
 
 
 class Config(BaseModel):

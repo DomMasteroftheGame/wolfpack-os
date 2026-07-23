@@ -8,9 +8,10 @@ fastapi>=0.111
 uvicorn>=0.30
 psutil>=5.9
 playwright>=1.40      # web_agent browser-automation skill (also run: playwright install chromium)
-speechrecognition>=3.10
-pyaudio>=0.2.14      # microphone input for the voice interface (needs portaudio dev headers on Linux)
-pyttsx3>=2.90
+# Voice deps (speechrecognition, pyaudio, pyttsx3) are intentionally NOT here —
+# pyaudio has no prebuilt wheel and needs a C compiler. They live in the
+# optional "voice" extra (pip install -e '.[voice]'), installed best-effort by
+# appliance/install-voice-stack.sh so voice can never break the core install.
 google-auth-oauthlib>=1.0
 google-auth-httplib2>=0.2
 google-api-python-client>=2.100

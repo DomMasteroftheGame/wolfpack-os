@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 STATE_FILE = ".wolfpack-state/voice.json"
 
+DEFAULT_VOICE_MODEL = "/opt/jarvis-os/data/voices/en_US-lessac-medium.onnx"
+
 DEFAULTS = {
     "enabled": True,
     "output_enabled": True,
@@ -26,6 +28,8 @@ DEFAULTS = {
     "persona_id": "ceo",
     "wake_word": "Alpha",
     "model": "vosk",
+    "voice_model": "en_US-lessac-medium.onnx",
+    "whisper_model": "base.en",
 }
 
 
@@ -90,14 +94,24 @@ class VoiceManager:
         env["WOLFPACK_VOICE_URL"] = self._voice_url
         env["WOLFPACK_WAKE"] = (self._state.get("wake_word") or "Alpha").lower()
         env["WOLFPACK_VOICE"] = "1" if self._state.get("output_enabled", True) else "0"
+        voices_dir = Path(os.environ.get("WOLFPACK_VOICE_MODEL", DEFAULT_VOICE_MODEL)).parent
+        env["WOLFPACK_VOICE_MODEL"] = str(
+            voices_dir / Path(self._state.get("voice_model") or DEFAULTS["voice_model"]).name
+        )
+        env["WOLFPACK_WHISPER"] = self._state.get("whisper_model") or DEFAULTS["whisper_model"]
 
         try:
+            # Keep the listener's [wake]/[skip]/[command] trail (and any crash)
+            # — DEVNULL made voice failures impossible to diagnose.
+            log_path = Path(self.runtime_dir) / "data" / "voice-listener.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_f = open(log_path, "a", buffering=1)  # noqa: SIM115
             self._proc = subprocess.Popen(
                 [sys.executable, str(listener)],
                 cwd=self.runtime_dir,
                 env=env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=log_f,
+                stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
             logger.info("Voice listener started (pid=%s)", self._proc.pid)

@@ -10,11 +10,15 @@ Run with:
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import platform
+import re
+import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -25,13 +29,15 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from jarvis_os.config import Config
+from jarvis_os.config import Config, LLMConfig, load_config
 from jarvis_os.core.runtime import Runtime
 from jarvis_os.core.discovery import PeerDiscovery
 from jarvis_os.core.inbox_bus import create_inbox_router
-from jarvis_os.core.personas import load_personas
+from jarvis_os.core.personas import get_persona, load_personas
+from jarvis_os.core.user_profile import PROFILE_FILENAME, default_config_dir
 from jarvis_os.core.voice_manager import VoiceManager
 from jarvis_os.interfaces.gui import netboot_router, usb_router
+from jarvis_os.llm.providers import get_provider
 
 try:
     import uvicorn
@@ -46,7 +52,30 @@ except ImportError:  # pragma: no cover
     psutil = None
 
 STATIC_DIR = Path(__file__).parent / "static"
+ONBOARDING_FILE = STATIC_DIR / "onboarding.html"
+COPILOT_STORE_DIR = Path(__file__).resolve().parents[3] / "data" / "copilot"
 MAX_FILE_BYTES = 2 * 1024 * 1024  # file editor cap
+PROVIDER_TEST_TIMEOUT = 30.0  # seconds; the wizard's provider round-trip never hangs the request
+
+# Providers the first-run wizard can configure. `binary` is the CLI looked up on
+# PATH (None = probe a local HTTP service instead); `model` is the harmless
+# default written into the generated jarvis.yaml and used for the test round-trip.
+ONBOARDING_PROVIDERS = [
+    {"id": "claude_cli", "label": "Claude Code CLI (subscription)", "binary": "claude", "model": "sonnet"},
+    {"id": "kimi_cli", "label": "Kimi Code CLI (subscription)", "binary": "kimi", "model": ""},
+    {"id": "ollama", "label": "Ollama (local models)", "binary": None, "model": "llama3.2"},
+]
+
+# The seven wolves shown as pack toggle cards in the wizard (all on by default).
+ONBOARDING_PACK = [
+    {"key": "ceo", "label": "CEO", "codename": "Alpha"},
+    {"key": "tech", "label": "Tech", "codename": "Sentinel"},
+    {"key": "marketing", "label": "Marketing", "codename": ""},
+    {"key": "finance", "label": "Finance", "codename": "Ledger"},
+    {"key": "analytics", "label": "Analytics", "codename": "Tracker"},
+    {"key": "bizdev", "label": "BizDev", "codename": "Cassius"},
+    {"key": "events", "label": "Events", "codename": "Ranger"},
+]
 
 
 class GoalRequest(BaseModel):
@@ -79,6 +108,8 @@ class VoiceSettingsRequest(BaseModel):
     always_listening: bool | None = None
     persona_id: str | None = None
     wake_word: str | None = None
+    voice_model: str | None = None
+    whisper_model: str | None = None
 
 
 class MemoryRecallRequest(BaseModel):
@@ -127,6 +158,14 @@ class FleetConfigRequest(BaseModel):
     updates: dict[str, Any]
 
 
+class PackRotateRequest(BaseModel):
+    kind: str
+
+
+class PackExecRequest(BaseModel):
+    command: str
+
+
 class WifiRequest(BaseModel):
     enabled: bool
 
@@ -140,6 +179,22 @@ class TerminalRequest(BaseModel):
     command: str
     cwd: str | None = None
     timeout: int = 30
+
+
+class ProviderTestRequest(BaseModel):
+    provider: str
+
+
+class CopilotImportRequest(BaseModel):
+    provider: str | None = None  # when set, an LLM pass refines the heuristic suggestions
+
+
+class OnboardingCompleteRequest(BaseModel):
+    operator: dict[str, Any]
+    business: dict[str, Any]
+    pack: dict[str, bool] = Field(default_factory=dict)
+    provider: str
+    integrations: dict[str, bool] = Field(default_factory=dict)
 
 
 def _nmcli_split(line: str) -> list[str]:
@@ -172,6 +227,142 @@ def _deep_merge(base: dict, updates: dict) -> dict:
         else:
             merged[key] = value
     return merged
+
+
+def _copilot_records(limit: int = 50) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Read the Dom Copilot progress store: latest summary + the last `limit` events.
+
+    Only the file tail is read so a long progress.jsonl stays cheap. Missing or
+    unreadable files yield empty results — the caller answers {"found": false}.
+    """
+    latest: dict[str, Any] = {}
+    latest_path = COPILOT_STORE_DIR / "latest.json"
+    if latest_path.is_file():
+        try:
+            data = json.loads(latest_path.read_text(encoding="utf-8", errors="replace"))
+            if isinstance(data, dict):
+                latest = data
+        except (OSError, json.JSONDecodeError):
+            latest = {}
+    records: list[dict[str, Any]] = []
+    progress_path = COPILOT_STORE_DIR / "progress.jsonl"
+    if progress_path.is_file():
+        try:
+            with progress_path.open("rb") as f:
+                f.seek(0, os.SEEK_END)
+                f.seek(max(0, f.tell() - 256 * 1024))
+                tail = f.read().decode("utf-8", errors="replace")
+        except OSError:
+            tail = ""
+        for line in tail.splitlines()[-limit:]:
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(record, dict):
+                records.append(record)
+    return latest, records
+
+
+def _copilot_heuristics(latest: dict[str, Any], records: list[dict[str, Any]]) -> dict[str, str]:
+    """Rule-based guesses for the wizard's business fields from copilot data.
+
+    The store knows the player's startup (latest.startup / structured.startup),
+    the copilot's last nudge (a decent proxy for the current goal), and free
+    text that may mention a target audience or $ prices. Suggestions only —
+    the operator edits before anything is saved.
+    """
+    texts = [str(r["text"]) for r in records if r.get("text")]
+    structured = [r["structured"] for r in records if isinstance(r.get("structured"), dict)]
+
+    sells = str(latest.get("startup") or "").strip()
+    if not sells:
+        for blob in reversed(structured):
+            sells = str(blob.get("startup") or "").strip()
+            if sells:
+                break
+
+    goal = str(latest.get("last_nudge") or "").strip()
+    if not goal and texts:
+        goal = texts[-1].strip()
+
+    customer = ""
+    for text in reversed(texts):
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            lowered = sentence.lower()
+            if any(phrase in lowered for phrase in ("target audience", "target customer", "ideal customer")):
+                customer = sentence.strip().rstrip("?")
+                break
+        if customer:
+            break
+
+    amounts: list[str] = []
+    for text in texts:
+        for amount in re.findall(r"\$\d[\d,]*(?:\.\d+)?", text):
+            if amount not in amounts:
+                amounts.append(amount)
+
+    return {
+        "sells": sells,
+        "customer": customer,
+        "prices": ", ".join(amounts[:5]),
+        "goal": goal,
+    }
+
+
+def _wizard_jarvis_config(provider: dict[str, Any]) -> dict[str, Any]:
+    """jarvis.yaml content for a completed wizard, modeled on config/example.yaml."""
+    cli_provider = provider["id"] in ("claude_cli", "kimi_cli")
+    return {
+        "llm": {
+            "provider": provider["id"],
+            "model": provider["model"],
+            "api_key": "",
+            "base_url": None,
+            "temperature": 0.7,
+            "max_tokens": 4096,
+        },
+        # The butler persona stays off; the operator's business profile is
+        # injected into agent prompts from user_profile.yaml instead.
+        "personality": {"enabled": False, "name": "Jarvis"},
+        "safety": {
+            "policy_file": "config/policy.yaml",
+            "audit_file": "data/audit.log",
+            "permissive": True,
+            "allow_sudo": False,
+            "allow_network": False,
+            "allowed_paths": ["~", "/tmp"],
+            "blocked_commands": ["rm -rf /", "mkfs", "dd", ":(){ :|:& };:"],
+        },
+        "scheduler": {"enabled": True, "check_interval_seconds": 1},
+        "autonomy": {"enabled": True, "max_iterations": 50, "reflection_enabled": True},
+        "network": {
+            "gui_host": "127.0.0.1",
+            "gui_port": 8080,
+            "discovery_enabled": True,
+            "discovery_port": 47600,
+            "delegation_token": None,
+        },
+        "memory": {
+            "mode": "local",
+            "hub_url": None,
+            "embed_url": None,
+            "embed_model": "nomic-embed-text",
+            # The CLI providers have no embeddings endpoint -> keyword recall only.
+            "semantic": not cli_provider,
+        },
+        "cluster": {"worker_enabled": False, "queue_url": None, "max_concurrent": 2, "poll_interval": 2.0},
+        "external_skills_dir": "./skills",
+        "embedded_app": {
+            "enabled": False,
+            "url": "https://buildyourwolfpack.com/pages/game#/select-startup",
+            "mode": "copilot",
+            "cdp_url": None,
+        },
+        "memory_db": "data/memory.db",
+        "log_level": "INFO",
+        "share": {"enabled": False, "path": None, "poll_interval": 3.0},
+    }
 
 
 class WebGUI:
@@ -257,6 +448,26 @@ class WebGUI:
             out.decode("utf-8", errors="replace").strip(),
             err.decode("utf-8", errors="replace").strip(),
         )
+
+    async def _pack_rotate(self, *args: str, timeout: float = 180.0) -> dict[str, Any]:
+        """Run appliance/pack-rotate.sh via sudo. Returns {"ok": bool, "output": str}."""
+        script = Path(__file__).resolve().parents[3] / "appliance" / "pack-rotate.sh"
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "sudo", "-n", "bash", str(script), *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                stdin=asyncio.subprocess.DEVNULL,
+            )
+        except (FileNotFoundError, OSError) as exc:
+            return {"ok": False, "output": f"failed to launch pack-rotate.sh: {exc}"}
+        try:
+            out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return {"ok": False, "output": f"pack-rotate.sh timed out after {int(timeout)}s"}
+        output = (out.decode("utf-8", errors="replace") + err.decode("utf-8", errors="replace")).strip()
+        return {"ok": proc.returncode == 0, "output": output}
 
     async def _run_terminal(self, command: str, cwd: str | None, timeout: int) -> dict[str, Any]:
         """Run a shell command for the web terminal, subject to the safety policy."""
@@ -419,13 +630,84 @@ class WebGUI:
             return {"ok": False, "error": detail}
         return {"ok": True, "detail": out}
 
+    def _wizard_required(self) -> bool:
+        """First-run flag: the wizard runs until user_profile.yaml exists."""
+        return not (default_config_dir() / PROFILE_FILENAME).is_file()
+
+    async def _detect_providers(self) -> list[dict[str, Any]]:
+        """Detect which wizard LLM providers are usable on this machine."""
+        ollama_detected = False
+        try:
+            async with httpx.AsyncClient(timeout=1.5) as client:
+                resp = await client.get("http://localhost:11434/api/version")
+                ollama_detected = resp.status_code == 200
+        except Exception:  # noqa: BLE001 - any failure means "not running"
+            ollama_detected = False
+        detected = {
+            "claude_cli": shutil.which("claude") is not None,
+            "kimi_cli": shutil.which("kimi") is not None,
+            "ollama": ollama_detected,
+        }
+        default = next((pid for pid in ("claude_cli", "kimi_cli", "ollama") if detected[pid]), "claude_cli")
+        return [
+            {"id": p["id"], "label": p["label"], "detected": detected[p["id"]], "default": p["id"] == default}
+            for p in ONBOARDING_PROVIDERS
+        ]
+
+    async def _copilot_llm_suggestions(
+        self,
+        provider_id: str,
+        latest: dict[str, Any],
+        records: list[dict[str, Any]],
+        heuristic: dict[str, str],
+    ) -> dict[str, str]:
+        """Refine the heuristic copilot suggestions with one LLM call. Falls back
+        to the heuristics on any error (unknown provider, timeout, bad JSON)."""
+        meta = next((p for p in ONBOARDING_PROVIDERS if p["id"] == provider_id), None)
+        if meta is None:
+            return heuristic
+        excerpt = json.dumps({"latest": latest, "recent": records[-20:]}, ensure_ascii=False)[:6000]
+        prompt = (
+            "From this business-simulator copilot log, infer the player's real-world business and reply "
+            "with ONLY a JSON object (no markdown, no commentary) with the keys sells, customer, prices, "
+            "goal: what they sell, their target customer, their prices/offers, and their current #1 goal. "
+            "Use an empty string for anything unknown.\n\n" + excerpt
+        )
+        try:
+            llm = get_provider(LLMConfig(provider=meta["id"], model=meta["model"]))
+            resp = await asyncio.wait_for(
+                llm.chat([{"role": "user", "content": prompt}]),
+                timeout=PROVIDER_TEST_TIMEOUT,
+            )
+            match = re.search(r"\{.*\}", (resp.get("content") or ""), re.DOTALL)
+            data = json.loads(match.group(0)) if match else None
+            if not isinstance(data, dict):
+                return heuristic
+        except Exception:  # noqa: BLE001 - suggestions are best-effort
+            return heuristic
+        merged = dict(heuristic)
+        for key in ("sells", "customer", "prices", "goal"):
+            value = str(data.get(key) or "").strip()
+            if value:
+                merged[key] = value
+        return merged
+
     def _register_routes(self) -> None:
         @self.app.get("/")
         async def desktop():  # noqa: WPS430
+            if self._wizard_required() and ONBOARDING_FILE.exists():
+                return FileResponse(ONBOARDING_FILE, media_type="text/html")
             desktop_file = STATIC_DIR / "desktop.html"
             if desktop_file.exists():
                 return FileResponse(desktop_file, media_type="text/html")
             return HTMLResponse(DASHBOARD_HTML)
+
+        @self.app.get("/onboarding")
+        async def onboarding_page():  # noqa: WPS430
+            # Direct preview of the first-run wizard (also reachable after completion).
+            if ONBOARDING_FILE.exists():
+                return FileResponse(ONBOARDING_FILE, media_type="text/html")
+            return JSONResponse(status_code=404, content={"error": "onboarding page not found"})
 
         @self.app.get("/static/{name}")
         async def static_file(name: str):  # noqa: WPS430
@@ -471,6 +753,110 @@ class WebGUI:
                     content={"error": f"Applied to runtime but failed to save {self.config_path}: {exc}"},
                 )
             return {"ok": True, "message": "Settings applied and saved."}
+
+        # --- First-run onboarding wizard ---
+        @self.app.get("/api/onboarding/status")
+        async def onboarding_status() -> dict[str, Any]:  # noqa: WPS430
+            completed = not self._wizard_required()
+            return {"wizard_required": not completed, "completed": completed}
+
+        @self.app.get("/api/onboarding/providers")
+        async def onboarding_providers() -> list[dict[str, Any]]:  # noqa: WPS430
+            return await self._detect_providers()
+
+        @self.app.post("/api/onboarding/test-provider")
+        async def onboarding_test_provider(payload: ProviderTestRequest) -> Any:  # noqa: WPS430
+            meta = next((p for p in ONBOARDING_PROVIDERS if p["id"] == payload.provider), None)
+            if meta is None:
+                return JSONResponse(status_code=400, content={"error": f"Unknown provider: {payload.provider}"})
+            try:
+                llm = get_provider(LLMConfig(provider=meta["id"], model=meta["model"]))
+                resp = await asyncio.wait_for(
+                    llm.chat([{"role": "user", "content": "Reply with exactly one word: ready"}]),
+                    timeout=PROVIDER_TEST_TIMEOUT,
+                )
+                reply = (resp.get("content") or "").strip()
+                return {"ok": True, "provider": payload.provider, "reply": reply[:500]}
+            except asyncio.TimeoutError:
+                return {"ok": False, "provider": payload.provider,
+                        "error": f"Timed out after {int(PROVIDER_TEST_TIMEOUT)}s"}
+            except Exception as exc:  # noqa: BLE001 - surface the CLI/API error to the wizard
+                return {"ok": False, "provider": payload.provider, "error": str(exc)}
+
+        @self.app.post("/api/onboarding/copilot-import")
+        async def onboarding_copilot_import(payload: CopilotImportRequest) -> dict[str, Any]:  # noqa: WPS430
+            latest, records = _copilot_records(limit=50)
+            if not latest and not records:
+                return {"found": False}
+            suggestions = _copilot_heuristics(latest, records)
+            source = "heuristic"
+            if payload.provider:
+                refined = await self._copilot_llm_suggestions(payload.provider, latest, records, suggestions)
+                if refined != suggestions:
+                    source = f"llm:{payload.provider}"
+                suggestions = refined
+            return {"found": True, "suggestions": suggestions, "source": source}
+
+        @self.app.post("/api/onboarding/complete")
+        async def onboarding_complete(payload: OnboardingCompleteRequest) -> Any:  # noqa: WPS430
+            errors: list[str] = []
+            name = str(payload.operator.get("name") or "").strip()
+            sells = str(payload.business.get("sells") or "").strip()
+            if not name:
+                errors.append("operator.name is required")
+            if not sells:
+                errors.append("business.sells is required")
+            provider = next((p for p in ONBOARDING_PROVIDERS if p["id"] == payload.provider), None)
+            if provider is None:
+                errors.append("provider must be one of: " + ", ".join(p["id"] for p in ONBOARDING_PROVIDERS))
+            if errors:
+                return JSONResponse(status_code=400, content={"error": "; ".join(errors)})
+
+            target_dir = default_config_dir()
+            try:
+                target_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                return JSONResponse(status_code=500, content={"error": f"Cannot create {target_dir}: {exc}"})
+
+            jarvis_path = target_dir / "jarvis.yaml"
+            profile_path = target_dir / PROFILE_FILENAME
+            profile_doc = {
+                "operator": {
+                    "name": name,
+                    "timezone": str(payload.operator.get("timezone") or "").strip(),
+                },
+                "business": {
+                    "sells": sells,
+                    "customer": str(payload.business.get("customer") or "").strip(),
+                    "prices": str(payload.business.get("prices") or "").strip(),
+                    "goal": str(payload.business.get("goal") or "").strip(),
+                },
+                "pack": {w["key"]: bool(payload.pack.get(w["key"], True)) for w in ONBOARDING_PACK},
+                "provider": provider["id"],
+                "integrations": {
+                    key: bool(payload.integrations.get(key, False))
+                    for key in ("google", "shopify", "instagram", "tiktok")
+                },
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            try:
+                with open(jarvis_path, "w", encoding="utf-8") as f:
+                    yaml.safe_dump(_wizard_jarvis_config(provider), f, sort_keys=False, allow_unicode=True)
+            except OSError as exc:
+                return JSONResponse(status_code=500, content={"error": f"Failed to write {jarvis_path}: {exc}"})
+            try:
+                load_config(jarvis_path)
+            except Exception as exc:  # noqa: BLE001
+                return JSONResponse(status_code=500, content={"error": f"Generated {jarvis_path} failed validation: {exc}"})
+            # The profile is written last: its presence marks the wizard complete.
+            try:
+                with open(profile_path, "w", encoding="utf-8") as f:
+                    yaml.safe_dump(profile_doc, f, sort_keys=False, allow_unicode=True)
+            except OSError as exc:
+                return JSONResponse(status_code=500, content={"error": f"Failed to write {profile_path}: {exc}"})
+            self.runtime.audit.record("onboarding_complete",
+                                      {"provider": provider["id"], "config_dir": str(target_dir)})
+            return {"ok": True, "files": [str(jarvis_path), str(profile_path)]}
 
         @self.app.get("/api/system")
         async def system_stats() -> dict[str, Any]:  # noqa: WPS430
@@ -751,13 +1137,22 @@ class WebGUI:
             ]
             return {"settings": self.voice.settings, "personas": personas, "running": self.voice.is_running()}
 
+        @self.app.get("/api/voice/voices")
+        async def voice_voices() -> dict[str, Any]:  # noqa: WPS430
+            from jarvis_os.core import voice
+            voices_dir = Path(voice.voice_model()).parent
+            if not voices_dir.is_dir():
+                voices_dir = Path(__file__).resolve().parents[3] / "data" / "voices"
+            voices = sorted(p.name for p in voices_dir.glob("*.onnx")) if voices_dir.is_dir() else []
+            return {"voices": voices}
+
         @self.app.post("/api/voice/settings")
         async def voice_settings_update(payload: VoiceSettingsRequest) -> dict[str, Any]:  # noqa: WPS430
             settings = {k: v for k, v in payload.model_dump().items() if v is not None}
             old = self.voice.settings
             new = self.voice.update(settings)
             restart = False
-            if any(new.get(k) != old.get(k) for k in ("wake_word", "output_enabled", "persona_id")):
+            if any(new.get(k) != old.get(k) for k in ("wake_word", "output_enabled", "persona_id", "voice_model", "whisper_model")):
                 restart = old.get("always_listening") or new.get("always_listening")
             if new.get("always_listening") and not old.get("always_listening"):
                 self.voice.start()
@@ -918,6 +1313,32 @@ class WebGUI:
             except Exception as exc:  # noqa: BLE001
                 return JSONResponse(status_code=400, content={"error": str(exc)})
             return {"ok": True, "message": "Config applied live. Persist manually if desired."}
+
+        # --- Pack operations (wraps appliance/pack-rotate.sh) ---
+        @self.app.get("/api/pack/status")
+        async def pack_status(request: Request) -> Any:  # noqa: WPS430
+            if not self._fleet_auth(request):
+                return JSONResponse(status_code=403, content={"error": "Forbidden"})
+            return await self._pack_rotate("status")
+
+        @self.app.post("/api/pack/rotate")
+        async def pack_rotate(request: Request, payload: PackRotateRequest) -> Any:  # noqa: WPS430
+            if not self._fleet_auth(request):
+                return JSONResponse(status_code=403, content={"error": "Forbidden"})
+            if payload.kind not in {"token", "password"}:
+                return JSONResponse(status_code=400, content={"error": "kind must be 'token' or 'password'"})
+            self.runtime.audit.record("pack_rotate", {"kind": payload.kind})
+            return await self._pack_rotate(payload.kind, "--yes")
+
+        @self.app.post("/api/pack/exec")
+        async def pack_exec(request: Request, payload: PackExecRequest) -> Any:  # noqa: WPS430
+            if not self._fleet_auth(request):
+                return JSONResponse(status_code=403, content={"error": "Forbidden"})
+            command = payload.command.strip()
+            if not command:
+                return JSONResponse(status_code=400, content={"error": "No command provided"})
+            self.runtime.audit.record("pack_exec", {"command": command})
+            return await self._pack_rotate("exec", command, "--yes")
 
         # --- Shared memory hub endpoints (sync defs => run in a threadpool so the
         #     embedding + DB work never blocks the event loop). ---

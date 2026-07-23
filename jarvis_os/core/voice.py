@@ -16,17 +16,20 @@ import threading
 logger = logging.getLogger(__name__)
 
 PIPER_DIR = os.environ.get("WOLFPACK_PIPER_DIR", "/opt/jarvis-os/data/piper")
-VOICE_MODEL = os.environ.get(
-    "WOLFPACK_VOICE_MODEL", "/opt/jarvis-os/data/voices/en_US-lessac-medium.onnx"
-)
+DEFAULT_VOICE_MODEL = "/opt/jarvis-os/data/voices/en_US-lessac-medium.onnx"
 ALSA_DEVICE = os.environ.get("WOLFPACK_ALSA_DEVICE", "default")
 ENABLED = os.environ.get("WOLFPACK_VOICE", "1") not in ("0", "false", "off", "")
 
 _piper_bin = os.path.join(PIPER_DIR, "piper")
 
 
+def voice_model() -> str:
+    """Resolve the piper voice model path per call so voice changes apply live."""
+    return os.environ.get("WOLFPACK_VOICE_MODEL", DEFAULT_VOICE_MODEL)
+
+
 def available() -> bool:
-    return ENABLED and os.path.isfile(_piper_bin) and os.path.isfile(VOICE_MODEL)
+    return ENABLED and os.path.isfile(_piper_bin) and os.path.isfile(voice_model())
 
 
 def _run(text: str) -> None:
@@ -36,7 +39,7 @@ def _run(text: str) -> None:
         os.close(fd)
         env = dict(os.environ, LD_LIBRARY_PATH=PIPER_DIR)
         subprocess.run(
-            [_piper_bin, "-m", VOICE_MODEL, "-f", wav],
+            [_piper_bin, "-m", voice_model(), "-f", wav],
             input=text.encode("utf-8"), env=env,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=90,
         )

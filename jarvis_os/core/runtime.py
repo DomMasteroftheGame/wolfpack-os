@@ -16,6 +16,7 @@ from jarvis_os.core.planner import Planner
 from jarvis_os.core.scheduler import Scheduler, ScheduledTask
 from jarvis_os.core.share_bus import ShareBus
 from jarvis_os.core.shared_memory import MemoryRouter
+from jarvis_os.core.user_profile import business_summary, load_user_profile
 from jarvis_os.llm.providers import get_provider
 from jarvis_os.safety.audit import AuditLog
 from jarvis_os.safety.executor import SafeExecutor
@@ -48,6 +49,9 @@ class Runtime:
         self.scheduler.on_trigger(self._on_scheduled_goal)
         self.autonomy = AutonomyEngine(self)
         self.router = AgentRouter(self)
+        # Lazily loaded operator business summary (first-run wizard profile);
+        # None = not loaded yet, "" = no profile on disk. See persona_message().
+        self._profile_summary: str | None = None
 
         # Hub coordination services (always constructed; enabled by config.hub.enabled).
         self.inbox = Inbox(config.inbox.path)
@@ -285,11 +289,19 @@ class Runtime:
         return messages
 
     def persona_message(self) -> dict[str, str] | None:
-        """System message carrying the configured personality, or None if disabled."""
+        """System message carrying the configured personality plus the operator's
+        business profile (written by the first-run wizard), or None if both empty."""
         p = self.config.personality
-        if not p.enabled or not p.persona.strip():
+        parts: list[str] = []
+        if p.enabled and p.persona.strip():
+            parts.append(p.persona.strip() + " Stay fully in character when replying.")
+        if self._profile_summary is None:
+            self._profile_summary = business_summary(load_user_profile())
+        if self._profile_summary:
+            parts.append(self._profile_summary)
+        if not parts:
             return None
-        return {"role": "system", "content": p.persona.strip() + " Stay fully in character when replying."}
+        return {"role": "system", "content": "\n\n".join(parts)}
 
     async def _summarize(self, goal: str, results: list[dict[str, Any]]) -> str:
         prompt = f"Goal: {goal}\nResults: {results}\nSummarize what was done in one or two sentences."

@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WolfPack OS // First Run Setup</title>
+<style>
+:root {
+  --bg: #050507;
+  --panel: rgba(12, 12, 16, 0.78);
+  --panel-solid: #0a0a0c;
+  --text: #f5f1e8;
+  --muted: #c9b48a;
+  --dim: rgba(201, 180, 138, 0.55);
+  --accent: #FFD700;
+  --accent-2: #d97706;
+  --success: #34d399;
+  --error: #f43f5e;
+  --border: rgba(255, 215, 0, 0.22);
+  --glow: rgba(255, 215, 0, 0.30);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: var(--mono);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+::selection { background: rgba(255, 215, 0, 0.30); color: var(--text); }
+.bg-grid {
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(255,215,0,0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,215,0,0.028) 1px, transparent 1px);
+  background-size: 45px 45px;
+  animation: gridMove 14s linear infinite;
+  pointer-events: none;
+}
+.bg-grid::before {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(255,215,0,0.07), transparent 55%),
+    radial-gradient(circle at 85% 92%, rgba(217,119,6,0.05), transparent 45%),
+    radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.55) 100%);
+}
+.bg-grid::after {
+  content: ""; position: absolute; inset: 0;
+  background: url("/static/wolfpack.png") center 42% / min(46vmin, 420px) no-repeat;
+  opacity: 0.05;
+  pointer-events: none;
+}
+@keyframes gridMove { to { background-position: 0 45px; } }
+.app {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  padding: 1.25rem;
+}
+header.hud-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.logo {
+  font-size: 1.5rem; font-weight: 800; letter-spacing: 0.28em;
+  color: var(--accent); text-shadow: 0 0 18px var(--glow);
+}
+.logo span { color: var(--text); font-weight: 300; }
+.header-tag {
+  font-size: 0.68rem; letter-spacing: 0.22em; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 0.35rem 0.9rem; background: var(--panel);
+}
+main {
+  flex: 1; width: 100%; max-width: 860px;
+  margin: 0 auto;
+  display: flex; flex-direction: column; gap: 1rem;
+}
+.stepper {
+  display: flex; gap: 0.4rem; flex-wrap: wrap;
+}
+.step-chip {
+  flex: 1; min-width: 90px;
+  font-size: 0.62rem; letter-spacing: 0.14em; text-align: center;
+  padding: 0.45rem 0.3rem;
+  border: 1px solid var(--border); border-radius: 0.4rem;
+  color: var(--dim); background: var(--panel);
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+.step-chip.active {
+  color: #0a0a0c; background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  border-color: var(--accent); font-weight: 800;
+  box-shadow: 0 0 16px var(--glow);
+}
+.step-chip.done { color: var(--accent); border-color: var(--accent); }
+.progress-track {
+  height: 3px; border-radius: 2px; overflow: hidden;
+  background: rgba(255, 215, 0, 0.12);
+}
+.progress-track div {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  box-shadow: 0 0 10px var(--glow);
+  transition: width 0.3s ease;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.35), inset 0 0 30px rgba(255, 215, 0, 0.03);
+  padding: 1.75rem;
+  position: relative; overflow: hidden;
+}
+.panel::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.6;
+}
+.step { display: none; animation: fadeInUp 0.35s ease forwards; }
+.step.active { display: block; }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.step-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem; letter-spacing: 0.22em; color: var(--accent);
+  text-transform: uppercase; font-weight: 800;
+}
+.step-title::before { content: "▸ "; }
+.step-sub { margin: 0 0 1.4rem; font-size: 0.78rem; color: var(--dim); }
+.field { margin-bottom: 1.1rem; }
+.field label {
+  display: block; margin-bottom: 0.4rem;
+  font-size: 0.68rem; letter-spacing: 0.16em; color: var(--muted);
+  text-transform: uppercase; font-weight: 700;
+}
+input[type="text"], textarea {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: rgba(3, 3, 5, 0.72);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: var(--mono);
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 0 18px rgba(255, 215, 0, 0.04);
+}
+input[type="text"]:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 18px var(--glow), inset 0 0 18px rgba(255, 215, 0, 0.08);
+}
+textarea { resize: vertical; min-height: 74px; }
+.hint { font-size: 0.68rem; color: var(--dim); margin-top: 0.3rem; }
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+.toggle-card, .radio-card {
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: rgba(3, 3, 5, 0.55);
+  padding: 0.9rem 1rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  position: relative;
+}
+.toggle-card:hover, .radio-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.toggle-card.on, .radio-card.on {
+  border-color: var(--accent);
+  background: rgba(255, 215, 0, 0.08);
+  box-shadow: 0 0 18px rgba(255, 215, 0, 0.12), inset 0 0 18px rgba(255, 215, 0, 0.05);
+}
+.toggle-card .name, .radio-card .name {
+  font-size: 0.85rem; font-weight: 800; letter-spacing: 0.1em; color: var(--text);
+  text-transform: uppercase;
+}
+.toggle-card .sub, .radio-card .sub { font-size: 0.68rem; color: var(--dim); margin-top: 0.2rem; }
+.toggle-card .state {
+  position: absolute; top: 0.7rem; right: 0.8rem;
+  font-size: 0.6rem; letter-spacing: 0.14em; font-weight: 800;
+  color: var(--dim);
+}
+.toggle-card.on .state { color: var(--accent); }
+.badge {
+  display: inline-block;
+  font-size: 0.58rem; letter-spacing: 0.14em; font-weight: 800;
+  padding: 0.15rem 0.5rem; border-radius: 0.3rem;
+  margin-top: 0.5rem;
+}
+.badge.ok { color: var(--success); border: 1px solid rgba(52, 211, 153, 0.4); }
+.badge.miss { color: var(--dim); border: 1px solid rgba(201, 180, 138, 0.3); }
+.test-btn {
+  margin-top: 0.6rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.65rem;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  box-shadow: none;
+  letter-spacing: 0.14em;
+}
+.test-btn:hover { background: rgba(255, 215, 0, 0.1); box-shadow: 0 0 12px var(--glow); }
+.test-result { font-size: 0.68rem; margin-top: 0.5rem; word-break: break-word; }
+.test-result.ok { color: var(--success); }
+.test-result.err { color: var(--error); }
+button {
+  position: relative;
+  padding: 0.8rem 2rem;
+  border: none; border-radius: 0.55rem;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  color: #0a0a0c;
+  font-weight: 800; font-size: 0.85rem; letter-spacing: 0.12em;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.25s ease;
+  box-shadow: 0 0 20px var(--glow);
+  text-transform: uppercase;
+}
+button:hover { transform: translateY(-2px); box-shadow: 0 0 30px var(--accent); }
+button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.btn-ghost:hover { background: rgba(255, 215, 0, 0.08); box-shadow: 0 0 14px var(--glow); }
+.nav-row {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 1rem; margin-top: 1.5rem;
+}
+.form-error {
+  color: var(--error); font-size: 0.72rem; letter-spacing: 0.06em;
+  min-height: 1em; flex: 1; text-align: center;
+}
+.import-row { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+.import-status { font-size: 0.7rem; color: var(--dim); }
+.import-status.ok { color: var(--success); }
+.import-status.err { color: var(--error); }
+.check-row {
+  display: flex; align-items: flex-start; gap: 0.8rem;
+  border: 1px solid var(--border); border-radius: 0.55rem;
+  background: rgba(3, 3, 5, 0.55);
+  padding: 0.85rem 1rem; margin-bottom: 0.7rem;
+  cursor: pointer; transition: border-color 0.15s ease;
+}
+.check-row:hover { border-color: var(--accent); }
+.check-row input { accent-color: var(--accent); margin-top: 0.2rem; }
+.check-row .name { font-size: 0.82rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.check-row .sub { font-size: 0.66rem; color: var(--dim); }
+.review-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+.review-table td {
+  padding: 0.55rem 0.4rem;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+  vertical-align: top;
+}
+.review-table td:first-child {
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em;
+  font-size: 0.62rem; font-weight: 800; width: 34%;
+}
+.success-hero { text-align: center; padding: 2.5rem 1rem; }
+.success-hero .big {
+  font-size: 1.6rem; font-weight: 800; letter-spacing: 0.24em;
+  color: var(--success); text-shadow: 0 0 22px rgba(52, 211, 153, 0.4);
+  margin-bottom: 0.8rem;
+}
+.success-hero p { color: var(--dim); font-size: 0.78rem; }
+.success-hero .files { font-size: 0.66rem; color: var(--muted); word-break: break-all; margin: 1rem 0 1.6rem; }
+footer.hud-footer {
+  display: flex; justify-content: space-between;
+  padding: 1rem 1.25rem 0;
+  font-size: 0.62rem; letter-spacing: 0.14em;
+  color: var(--dim); text-transform: uppercase;
+}
+@media (max-width: 640px) {
+  .panel { padding: 1.2rem; }
+  .logo { font-size: 1.1rem; }
+}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="app">
+  <header class="hud-header">
+    <div class="logo">WOLFPACK<span>OS</span></div>
+    <div class="header-tag">FIRST RUN // PACK SETUP</div>
+  </header>
+  <main>
+    <div class="stepper" id="stepper"></div>
+    <div class="progress-track"><div id="progressBar"></div></div>
+    <section class="panel" id="wizardPanel">
+
+      <div class="step" data-step="0">
+        <h2 class="step-title">Operator</h2>
+        <p class="step-sub">Who leads this pack? Your name and timezone anchor every schedule and report.</p>
+        <div class="field">
+          <label for="opName">Operator name</label>
+          <input type="text" id="opName" placeholder="e.g. Dom" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="opTz">Timezone</label>
+          <input type="text" id="opTz" placeholder="America/New_York">
+          <div class="hint">Detected from your browser — edit if the pack lives elsewhere.</div>
+        </div>
+      </div>
+
+      <div class="step" data-step="1">
+        <h2 class="step-title">Business</h2>
+        <p class="step-sub">What the pack is hunting for. This context is injected into every wolf's briefing.</p>
+        <div class="import-row">
+          <button type="button" class="btn-ghost" id="copilotImport">⇩ Import from Dom Copilot</button>
+          <span class="import-status" id="importStatus"></span>
+        </div>
+        <div class="field">
+          <label for="bizSells">What do you sell?</label>
+          <input type="text" id="bizSells" placeholder="e.g. Small-batch coffee blends">
+        </div>
+        <div class="field">
+          <label for="bizCustomer">Target customer</label>
+          <input type="text" id="bizCustomer" placeholder="e.g. Office coffee drinkers who order online">
+        </div>
+        <div class="field">
+          <label for="bizPrices">Prices / offers</label>
+          <input type="text" id="bizPrices" placeholder="e.g. $18/bag, $45/mo subscription">
+        </div>
+        <div class="field">
+          <label for="bizGoal">Current #1 goal</label>
+          <textarea id="bizGoal" placeholder="e.g. Land the first 20 paying subscribers"></textarea>
+        </div>
+      </div>
+
+      <div class="step" data-step="2">
+        <h2 class="step-title">Pack</h2>
+        <p class="step-sub">The seven wolves. All ride by default — tap a card to bench one.</p>
+        <div class="card-grid" id="packGrid"></div>
+      </div>
+
+      <div class="step" data-step="3">
+        <h2 class="step-title">Provider</h2>
+        <p class="step-sub">The pack's brain. Detected on this machine — run the round-trip test before you commit.</p>
+        <div class="card-grid" id="providerGrid"></div>
+      </div>
+
+      <div class="step" data-step="4">
+        <h2 class="step-title">Integrations</h2>
+        <p class="step-sub">Optional channels. Flags only — you connect the accounts later, nothing is touched now.</p>
+        <div id="integrationList"></div>
+      </div>
+
+      <div class="step" data-step="5">
+        <h2 class="step-title">Review &amp; Launch</h2>
+        <p class="step-sub">Confirm the pack manifest. Launch writes jarvis.yaml + user_profile.yaml and opens the dashboard.</p>
+        <table class="review-table" id="reviewTable"></table>
+      </div>
+
+      <div class="step" id="successStep">
+        <div class="success-hero">
+          <div class="big">PACK DEPLOYED</div>
+          <p>Configuration written. Your wolves are briefed and waiting.</p>
+          <div class="files" id="successFiles"></div>
+          <button type="button" onclick="window.location.href='/'">Enter the Dashboard →</button>
+        </div>
+      </div>
+
+      <div class="nav-row" id="navRow">
+        <button type="button" class="btn-ghost" id="backBtn">← Back</button>
+        <div class="form-error" id="formError"></div>
+        <button type="button" id="nextBtn">Next →</button>
+      </div>
+    </section>
+  </main>
+  <footer class="hud-footer">
+    <span>WOLFPACK OS // FIRST RUN</span>
+    <span>Secure Connection</span>
+  </footer>
+</div>
+<script>
+const STEPS = ['Operator', 'Business', 'Pack', 'Provider', 'Integrations', 'Launch'];
+const PACK_WOLVES = [
+  { key: 'ceo',       label: 'CEO',       codename: 'Alpha' },
+  { key: 'tech',      label: 'Tech',      codename: 'Sentinel' },
+  { key: 'marketing', label: 'Marketing', codename: '' },
+  { key: 'finance',   label: 'Finance',   codename: 'Ledger' },
+  { key: 'analytics', label: 'Analytics', codename: 'Tracker' },
+  { key: 'bizdev',    label: 'BizDev',    codename: 'Cassius' },
+  { key: 'events',    label: 'Events',    codename: 'Ranger' },
+];
+const INTEGRATIONS = [
+  { key: 'google',    label: 'Google',    sub: 'Gmail + Calendar — connect later with OAuth' },
+  { key: 'shopify',   label: 'Shopify',   sub: 'Storefront orders — connect later' },
+  { key: 'instagram', label: 'Instagram', sub: 'Social presence — connect later' },
+  { key: 'tiktok',    label: 'TikTok',    sub: 'Short-form channel — connect later' },
+];
+
+const state = {
+  operator: { name: '', timezone: '' },
+  business: { sells: '', customer: '', prices: '', goal: '' },
+  pack: Object.fromEntries(PACK_WOLVES.map(w => [w.key, true])),
+  provider: null,
+  providers: [],
+  integrations: Object.fromEntries(INTEGRATIONS.map(i => [i.key, false])),
+};
+let current = 0;
+let finished = false;
+
+const stepper = document.getElementById('stepper');
+const progressBar = document.getElementById('progressBar');
+const backBtn = document.getElementById('backBtn');
+const nextBtn = document.getElementById('nextBtn');
+const formError = document.getElementById('formError');
+const navRow = document.getElementById('navRow');
+
+STEPS.forEach((label, i) => {
+  const chip = document.createElement('div');
+  chip.className = 'step-chip';
+  chip.textContent = String(i + 1).padStart(2, '0') + ' ' + label;
+  stepper.appendChild(chip);
+});
+
+function escapeHtml(text) {
+  return String(text === null || text === undefined ? '' : text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function collectFields() {
+  state.operator.name = document.getElementById('opName').value.trim();
+  state.operator.timezone = document.getElementById('opTz').value.trim();
+  state.business.sells = document.getElementById('bizSells').value.trim();
+  state.business.customer = document.getElementById('bizCustomer').value.trim();
+  state.business.prices = document.getElementById('bizPrices').value.trim();
+  state.business.goal = document.getElementById('bizGoal').value.trim();
+}
+
+function showStep(i) {
+  current = i;
+  document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+  document.querySelector('.step[data-step="' + i + '"]').classList.add('active');
+  document.querySelectorAll('.step-chip').forEach((chip, j) => {
+    chip.classList.toggle('active', j === i);
+    chip.classList.toggle('done', j < i);
+  });
+  progressBar.style.width = ((i + 1) / STEPS.length * 100) + '%';
+  backBtn.style.visibility = i === 0 ? 'hidden' : 'visible';
+  nextBtn.textContent = i === STEPS.length - 1 ? '⟐ Launch' : 'Next →';
+  formError.textContent = '';
+  if (i === 3 && !state.providers.length) loadProviders();
+  if (i === 5) buildReview();
+}
+
+function validateStep(i) {
+  if (i === 0 && !state.operator.name) return 'Operator name is required.';
+  if (i === 1 && !state.business.sells) return 'Tell the pack what you sell.';
+  if (i === 3 && !state.provider) return 'Pick a provider for the pack\'s brain.';
+  return '';
+}
+
+/* ---- pack toggle cards ---- */
+function renderPack() {
+  const grid = document.getElementById('packGrid');
+  grid.innerHTML = '';
+  for (const wolf of PACK_WOLVES) {
+    const card = document.createElement('div');
+    card.className = 'toggle-card' + (state.pack[wolf.key] ? ' on' : '');
+    card.innerHTML = '<div class="name">' + escapeHtml(wolf.label) + '</div>' +
+      (wolf.codename ? '<div class="sub">codename ' + escapeHtml(wolf.codename) + '</div>' : '<div class="sub">&nbsp;</div>') +
+      '<div class="state">' + (state.pack[wolf.key] ? 'ACTIVE' : 'BENCHED') + '</div>';
+    card.onclick = () => {
+      state.pack[wolf.key] = !state.pack[wolf.key];
+      renderPack();
+    };
+    grid.appendChild(card);
+  }
+}
+
+/* ---- providers ---- */
+async function loadProviders() {
+  const grid = document.getElementById('providerGrid');
+  grid.innerHTML = '<div class="hint">Scanning this machine…</div>';
+  try {
+    const res = await fetch('/api/onboarding/providers');
+    state.providers = await res.json();
+  } catch (err) {
+    grid.innerHTML = '<div class="test-result err">Detection failed: ' + escapeHtml(err.message) + '</div>';
+    return;
+  }
+  if (!state.provider) {
+    const def = state.providers.find(p => p.default) || state.providers[0];
+    if (def) state.provider = def.id;
+  }
+  renderProviders();
+}
+
+function renderProviders() {
+  const grid = document.getElementById('providerGrid');
+  grid.innerHTML = '';
+  for (const p of state.providers) {
+    const card = document.createElement('div');
+    card.className = 'radio-card' + (state.provider === p.id ? ' on' : '');
+    card.innerHTML =
+      '<div class="name">' + escapeHtml(p.label) + '</div>' +
+      '<div class="sub">' + escapeHtml(p.id) + '</div>' +
+      '<span class="badge ' + (p.detected ? 'ok' : 'miss') + '">' + (p.detected ? 'DETECTED' : 'NOT FOUND') + '</span>' +
+      (p.detected ? '<br><button type="button" class="test-btn" data-provider="' + escapeHtml(p.id) + '">Test</button>' : '') +
+      '<div class="test-result" id="test-' + escapeHtml(p.id) + '"></div>';
+    card.onclick = (e) => {
+      if (e.target.classList.contains('test-btn')) return;
+      state.provider = p.id;
+      renderProviders();
+    };
+    grid.appendChild(card);
+  }
+  grid.querySelectorAll('.test-btn').forEach(btn => {
+    btn.onclick = () => testProvider(btn.dataset.provider, btn);
+  });
+}
+
+async function testProvider(providerId, btn) {
+  state.provider = providerId;
+  renderProviders();
+  const result = document.getElementById('test-' + providerId);
+  const freshBtn = Array.from(document.querySelectorAll('.test-btn')).find(b => b.dataset.provider === providerId);
+  if (freshBtn) freshBtn.disabled = true;
+  result.className = 'test-result';
+  result.textContent = 'TESTING ROUND-TRIP…';
+  try {
+    const res = await fetch('/api/onboarding/test-provider', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: providerId }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      result.className = 'test-result ok';
+      result.textContent = 'OK — reply: ' + (data.reply || '(empty)');
+    } else {
+      result.className = 'test-result err';
+      result.textContent = 'FAILED — ' + (data.error || res.status);
+    }
+  } catch (err) {
+    result.className = 'test-result err';
+    result.textContent = 'FAILED — ' + err.message;
+  } finally {
+    if (freshBtn) freshBtn.disabled = false;
+  }
+}
+
+/* ---- copilot import ---- */
+document.getElementById('copilotImport').onclick = async () => {
+  const status = document.getElementById('importStatus');
+  const btn = document.getElementById('copilotImport');
+  btn.disabled = true;
+  status.className = 'import-status';
+  status.textContent = 'Reading copilot progress…';
+  try {
+    const res = await fetch('/api/onboarding/copilot-import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: state.provider }),
+    });
+    const data = await res.json();
+    if (!data.found) {
+      status.className = 'import-status err';
+      status.textContent = 'No Dom Copilot data found on this machine.';
+      return;
+    }
+    const s = data.suggestions || {};
+    if (s.sells) document.getElementById('bizSells').value = s.sells;
+    if (s.customer) document.getElementById('bizCustomer').value = s.customer;
+    if (s.prices) document.getElementById('bizPrices').value = s.prices;
+    if (s.goal) document.getElementById('bizGoal').value = s.goal;
+    status.className = 'import-status ok';
+    status.textContent = 'Suggestions loaded (' + (data.source || 'heuristic') + ') — review and edit freely.';
+  } catch (err) {
+    status.className = 'import-status err';
+    status.textContent = 'Import failed: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+/* ---- integrations ---- */
+function renderIntegrations() {
+  const list = document.getElementById('integrationList');
+  list.innerHTML = '';
+  for (const item of INTEGRATIONS) {
+    const row = document.createElement('label');
+    row.className = 'check-row';
+    row.innerHTML = '<input type="checkbox" ' + (state.integrations[item.key] ? 'checked' : '') + '>' +
+      '<span><span class="name">' + escapeHtml(item.label) + '</span><br>' +
+      '<span class="sub">' + escapeHtml(item.sub) + '</span></span>';
+    row.querySelector('input').onchange = (e) => { state.integrations[item.key] = e.target.checked; };
+    list.appendChild(row);
+  }
+}
+
+/* ---- review ---- */
+function buildReview() {
+  const activeWolves = PACK_WOLVES.filter(w => state.pack[w.key]).map(w => w.label).join(', ') || 'none';
+  const benched = PACK_WOLVES.filter(w => !state.pack[w.key]).map(w => w.label).join(', ');
+  const integrations = INTEGRATIONS.filter(i => state.integrations[i.key]).map(i => i.label).join(', ') || 'none — connect later';
+  const rows = [
+    ['Operator', state.operator.name + (state.operator.timezone ? ' · ' + state.operator.timezone : '')],
+    ['Sells', state.business.sells],
+    ['Customer', state.business.customer || '—'],
+    ['Prices / offers', state.business.prices || '—'],
+    ['#1 goal', state.business.goal || '—'],
+    ['Pack', activeWolves + (benched ? ' (benched: ' + benched + ')' : '')],
+    ['Provider', state.provider || '—'],
+    ['Integrations', integrations],
+  ];
+  document.getElementById('reviewTable').innerHTML = rows
+    .map(([k, v]) => '<tr><td>' + escapeHtml(k) + '</td><td>' + escapeHtml(v) + '</td></tr>')
+    .join('');
+}
+
+/* ---- launch ---- */
+async function launch() {
+  formError.textContent = '';
+  nextBtn.disabled = true;
+  backBtn.disabled = true;
+  nextBtn.textContent = 'DEPLOYING…';
+  try {
+    const res = await fetch('/api/onboarding/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        operator: state.operator,
+        business: state.business,
+        pack: state.pack,
+        provider: state.provider,
+        integrations: state.integrations,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      formError.textContent = data.error || ('Launch failed (' + res.status + ')');
+      return;
+    }
+    finished = true;
+    document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+    document.getElementById('successStep').classList.add('active');
+    document.getElementById('successFiles').textContent = (data.files || []).join('  ·  ');
+    navRow.style.display = 'none';
+    progressBar.style.width = '100%';
+    document.querySelectorAll('.step-chip').forEach(chip => { chip.classList.remove('active'); chip.classList.add('done'); });
+  } catch (err) {
+    formError.textContent = 'Launch failed: ' + err.message;
+  } finally {
+    if (!finished) {
+      nextBtn.disabled = false;
+      backBtn.disabled = false;
+      nextBtn.textContent = '⟐ Launch';
+    }
+  }
+}
+
+nextBtn.onclick = () => {
+  collectFields();
+  if (current === STEPS.length - 1) { launch(); return; }
+  const err = validateStep(current);
+  if (err) { formError.textContent = err; return; }
+  showStep(current + 1);
+};
+backBtn.onclick = () => {
+  collectFields();
+  if (current > 0) showStep(current - 1);
+};
+
+/* ---- init ---- */
+try {
+  document.getElementById('opTz').value = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+} catch (e) { /* leave blank */ }
+renderPack();
+renderIntegrations();
+showStep(0);
+</script>
+</body>
+</html>

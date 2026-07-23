@@ -36,7 +36,7 @@ def _wake_aliases() -> set[str]:
     """Common speech-to-text misspellings of the wake word."""
     aliases = {WAKE}
     if WAKE == "alpha":
-        aliases |= {"alfa", "alva"}
+        aliases |= {"alfa", "alva", "elsa", "alphon"}
     return aliases
 
 
@@ -118,13 +118,20 @@ def main() -> None:
         buf = bytearray()
         if not vtext:  # Vosk found no speech in this utterance -> just silence
             continue
-        # Accurate transcription of EVERY utterance via Whisper; used for wake + command.
-        wtext = _whisper_text(whisper, utt).lower().strip(" ,.!?")
-        if not wtext:
+        aliases = _wake_aliases()
+        # Cheap gate: only spend the (heavy) Whisper decode on utterances whose
+        # Vosk text suggests the wake word. Constant room noise would otherwise
+        # keep Whisper decoding 24/7 — and a wedged decode silently hangs the
+        # whole listener (futex deadlock observed with ctranslate2 on the
+        # linux-surface kernel).
+        if not awaiting and not any(a in vtext.lower() for a in aliases):
+            print(f"[skip] {vtext}", flush=True)
             continue
+        # Accurate transcription of the suspected command; fall back to Vosk's
+        # text if Whisper returns nothing.
+        wtext = _whisper_text(whisper, utt).lower().strip(" ,.!?") or vtext
 
         cmd = ""
-        aliases = _wake_aliases()
         is_wake = wtext.split(" ")[0] in aliases or any(a in wtext for a in aliases)
         if awaiting:
             awaiting = False
