@@ -83,10 +83,19 @@ async def main_async() -> int:
     except FileNotFoundError:
         if args.interface == "gui":
             # First run on a fresh install: no config yet — boot with defaults so
-            # the onboarding wizard can write config/jarvis.yaml itself.
+            # the onboarding wizard can write config/jarvis.yaml itself. Pick a
+            # keyless provider by detection so Runtime() doesn't demand an API key.
             logger.warning("No config at %s — first-run: booting the onboarding wizard with defaults.", args.config)
             from jarvis_os.config import Config
             config = Config()
+            import shutil
+            if shutil.which("claude"):
+                config.llm.provider = "claude_cli"
+            elif shutil.which("kimi"):
+                config.llm.provider = "kimi_cli"
+            else:
+                config.llm.provider = "ollama"
+            logger.info("First-run provider: %s", config.llm.provider)
         else:
             logger.error("Config not found: %s", args.config)
             print(f"Config not found: {args.config}", file=sys.stderr)
