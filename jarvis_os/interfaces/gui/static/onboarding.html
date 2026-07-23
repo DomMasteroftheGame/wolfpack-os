@@ -355,6 +355,21 @@ footer.hud-footer {
       </div>
 
       <div class="step" data-step="5">
+        <h2 class="step-title">Network / WiFi</h2>
+        <p class="step-sub">Optional — appliance boxes use these credentials to get online and install dependencies. Skippable; never required to launch.</p>
+        <div class="field">
+          <label for="wifiSsid">WiFi network (SSID)</label>
+          <input type="text" id="wifiSsid" placeholder="e.g. WolfDen-5G" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="wifiPsk">WiFi password</label>
+          <input type="password" id="wifiPsk" placeholder="network password" autocomplete="new-password">
+          <div class="hint"><label style="display:inline;cursor:pointer;text-transform:none;letter-spacing:0.06em;"><input type="checkbox" id="wifiShow"> show password</label> — stored only in user_profile.yaml, never in jarvis.yaml.</div>
+        </div>
+        <button type="button" class="btn-ghost" id="wifiSkip">Skip — use Ethernet / already connected</button>
+      </div>
+
+      <div class="step" data-step="6">
         <h2 class="step-title">Review &amp; Launch</h2>
         <p class="step-sub">Confirm the pack manifest. Launch writes jarvis.yaml + user_profile.yaml and opens the dashboard.</p>
         <table class="review-table" id="reviewTable"></table>
@@ -382,7 +397,7 @@ footer.hud-footer {
   </footer>
 </div>
 <script>
-const STEPS = ['Operator', 'Business', 'Pack', 'Provider', 'Integrations', 'Launch'];
+const STEPS = ['Operator', 'Business', 'Pack', 'Provider', 'Integrations', 'Network', 'Launch'];
 const PACK_WOLVES = [
   { key: 'ceo',       label: 'CEO',       codename: 'Alpha' },
   { key: 'tech',      label: 'Tech',      codename: 'Sentinel' },
@@ -406,6 +421,7 @@ const state = {
   provider: null,
   providers: [],
   integrations: Object.fromEntries(INTEGRATIONS.map(i => [i.key, false])),
+  wifi: { ssid: '', psk: '' },
 };
 let current = 0;
 let finished = false;
@@ -436,6 +452,8 @@ function collectFields() {
   state.business.customer = document.getElementById('bizCustomer').value.trim();
   state.business.prices = document.getElementById('bizPrices').value.trim();
   state.business.goal = document.getElementById('bizGoal').value.trim();
+  state.wifi.ssid = document.getElementById('wifiSsid').value.trim();
+  state.wifi.psk = document.getElementById('wifiPsk').value;
 }
 
 function showStep(i) {
@@ -451,13 +469,17 @@ function showStep(i) {
   nextBtn.textContent = i === STEPS.length - 1 ? '⟐ Launch' : 'Next →';
   formError.textContent = '';
   if (i === 3 && !state.providers.length) loadProviders();
-  if (i === 5) buildReview();
+  if (i === 6) buildReview();
 }
 
 function validateStep(i) {
   if (i === 0 && !state.operator.name) return 'Operator name is required.';
   if (i === 1 && !state.business.sells) return 'Tell the pack what you sell.';
   if (i === 3 && !state.provider) return 'Pick a provider for the pack\'s brain.';
+  // WiFi is optional and never blocks launch — but half a credential is useless.
+  if (i === 5 && ((state.wifi.ssid && !state.wifi.psk) || (!state.wifi.ssid && state.wifi.psk))) {
+    return 'Enter both SSID and password, or Skip WiFi.';
+  }
   return '';
 }
 
@@ -614,11 +636,24 @@ function buildReview() {
     ['Pack', activeWolves + (benched ? ' (benched: ' + benched + ')' : '')],
     ['Provider', state.provider || '—'],
     ['Integrations', integrations],
+    ['WiFi', state.wifi.ssid ? state.wifi.ssid + ' (password stored)' : 'skipped — Ethernet / already connected'],
   ];
   document.getElementById('reviewTable').innerHTML = rows
     .map(([k, v]) => '<tr><td>' + escapeHtml(k) + '</td><td>' + escapeHtml(v) + '</td></tr>')
     .join('');
 }
+
+/* ---- wifi step ---- */
+document.getElementById('wifiShow').onchange = (e) => {
+  document.getElementById('wifiPsk').type = e.target.checked ? 'text' : 'password';
+};
+document.getElementById('wifiSkip').onclick = () => {
+  document.getElementById('wifiSsid').value = '';
+  document.getElementById('wifiPsk').value = '';
+  state.wifi.ssid = '';
+  state.wifi.psk = '';
+  showStep(6);
+};
 
 /* ---- launch ---- */
 async function launch() {
@@ -627,16 +662,19 @@ async function launch() {
   backBtn.disabled = true;
   nextBtn.textContent = 'DEPLOYING…';
   try {
+    const payload = {
+      operator: state.operator,
+      business: state.business,
+      pack: state.pack,
+      provider: state.provider,
+      integrations: state.integrations,
+    };
+    // WiFi only travels when a full credential was entered; skipped = key omitted.
+    if (state.wifi.ssid && state.wifi.psk) payload.wifi = { ssid: state.wifi.ssid, psk: state.wifi.psk };
     const res = await fetch('/api/onboarding/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        operator: state.operator,
-        business: state.business,
-        pack: state.pack,
-        provider: state.provider,
-        integrations: state.integrations,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {

@@ -195,6 +195,7 @@ class OnboardingCompleteRequest(BaseModel):
     pack: dict[str, bool] = Field(default_factory=dict)
     provider: str
     integrations: dict[str, bool] = Field(default_factory=dict)
+    wifi: dict[str, Any] | None = None  # optional; stored only when ssid + psk are both set
 
 
 def _nmcli_split(line: str) -> list[str]:
@@ -839,6 +840,13 @@ class WebGUI:
                 },
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
+            # WiFi is optional and never blocks completion: it is stored in the
+            # profile only as a full credential (both ssid + psk), never in jarvis.yaml.
+            wifi = payload.wifi or {}
+            wifi_ssid = str(wifi.get("ssid") or "").strip()
+            wifi_psk = str(wifi.get("psk") or "")
+            if wifi_ssid and wifi_psk:
+                profile_doc["wifi"] = {"ssid": wifi_ssid, "psk": wifi_psk}
             try:
                 with open(jarvis_path, "w", encoding="utf-8") as f:
                     yaml.safe_dump(_wizard_jarvis_config(provider), f, sort_keys=False, allow_unicode=True)
