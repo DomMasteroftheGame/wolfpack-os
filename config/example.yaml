@@ -1,10 +1,13 @@
 # Jarvis OS example configuration
 
 llm:
-  provider: kimi          # kimi | anthropic | openai
-  model: kimi-k2-0711-preview
-  api_key: ""             # set your API key here
-  base_url: null          # optional custom endpoint
+  # Subscription-first (recommended): your own CLI carries auth — no API key.
+  #   kimi_cli   (kimi -p, Kimi Code) | claude_cli (claude --print, Claude Code) | ollama (local)
+  # Key-based alternatives: kimi | anthropic | openai (set api_key below).
+  provider: kimi_cli
+  model: kimi
+  api_key: ""             # only needed for key-based providers
+  base_url: null          # optional custom endpoint or CLI path
   temperature: 0.3
   max_tokens: 4096
 
