@@ -81,10 +81,17 @@ async def main_async() -> int:
     try:
         config = load_config(args.config)
     except FileNotFoundError:
-        logger.error("Config not found: %s", args.config)
-        print(f"Config not found: {args.config}", file=sys.stderr)
-        print("Copy config/example.yaml to config/jarvis.yaml and edit it.", file=sys.stderr)
-        return 1
+        if args.interface == "gui":
+            # First run on a fresh install: no config yet — boot with defaults so
+            # the onboarding wizard can write config/jarvis.yaml itself.
+            logger.warning("No config at %s — first-run: booting the onboarding wizard with defaults.", args.config)
+            from jarvis_os.config import Config
+            config = Config()
+        else:
+            logger.error("Config not found: %s", args.config)
+            print(f"Config not found: {args.config}", file=sys.stderr)
+            print("Copy config/example.yaml to config/jarvis.yaml and edit it.", file=sys.stderr)
+            return 1
 
     if args.hub:
         config.hub.enabled = True
