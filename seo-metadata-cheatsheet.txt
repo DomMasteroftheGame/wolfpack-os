@@ -1,0 +1,9 @@
+==========================================================
+WOLFPACK OS - METADATA CHEATSHEET FOR GITHUB SIDEBAR
+==========================================================
+
+[1] REPOSITORY DESCRIPTION (applied via gh repo edit --description):
+Autonomous, local multi-agent operating layer powered by Claude Code & Kimi Code. Automates business workflows via Chrome CDP, browser automation, and pluggable AI personas without metered API costs.
+
+[2] REPOSITORY TOPICS (applied via gh repo edit --add-topic):
+ai-agents, autonomous-agents, browser-automation, claude-code, agentic-workflows, multi-agent-systems, cdp-automation, python-automation, local-ai, workflow-automation, devtools-protocol, kimi-code, agent-operating-system, task-automation, self-hosted-ai
