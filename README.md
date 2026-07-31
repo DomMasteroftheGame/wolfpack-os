@@ -11,6 +11,7 @@
   <a href="https://www.tiktok.com/@psychowolfpack1985"><img src="https://img.shields.io/badge/TikTok-000000?style=for-the-badge&logo=tiktok&logoColor=white" alt="TikTok" /></a>
   <a href="https://www.youtube.com/@buildyourwolfpack"><img src="https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube" /></a>
   <a href="https://buildyourwolfpack.substack.com"><img src="https://img.shields.io/badge/Substack-FF6719?style=for-the-badge&logo=substack&logoColor=white" alt="Substack" /></a>
+  <a href="https://x.com/PSYCHOWOLFPACK1"><img src="https://img.shields.io/badge/X-000000?style=for-the-badge&logo=x&logoColor=white" alt="X" /></a>
   <a href="https://discord.gg/s5vr7UtkkB"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-BSL%201.1-FFD700?style=for-the-badge&logo=scale&logoColor=black" alt="License: BSL 1.1" /></a>
   <br/><br/>
