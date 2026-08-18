@@ -21,6 +21,9 @@ class LLMConfig(BaseModel):
     base_url: str | None = None
     temperature: float = 0.3
     max_tokens: int = 4096
+    # HTTP timeout for LLM calls. The default covers the local 3B; the
+    # sovereign K3 node runs minutes per token — give it ~90 min.
+    timeout_seconds: float = 300.0
 
     @model_validator(mode="after")
     def _resolve_api_key(self) -> "LLMConfig":

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- No Activity in this app; the host renders templates, so the theme is
+         cosmetic. car-app 1.4.0 ships no Theme.CarApp style — use a platform
+         dark theme (carColorPrimary* attrs exist if we want to tint later). -->
+    <style name="AppTheme" parent="android:style/Theme.Material" />
+</resources>

@@ -142,8 +142,11 @@ class OllamaProvider(LLMProvider):
         self.config = config
         self.base_url = config.base_url or "http://localhost:11434"
         # CPU-only nodes evaluate the copilot's ~2.5k-token game-knowledge
-        # prompt at ~18 tok/s — 120s kills them mid-prompt. 300s covers it.
-        self.client = httpx.AsyncClient(base_url=self.base_url, timeout=300.0)
+        # prompt at ~18 tok/s — 120s kills them mid-prompt. 300s default
+        # covers it; the sovereign K3 node sets timeout_seconds far higher.
+        self.client = httpx.AsyncClient(
+            base_url=self.base_url, timeout=config.timeout_seconds
+        )
 
     async def chat(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
         payload = {
