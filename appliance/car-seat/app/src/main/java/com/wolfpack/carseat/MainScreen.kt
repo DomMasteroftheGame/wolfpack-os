@@ -64,14 +64,11 @@ class MainScreen(carContext: CarContext) : PollScreen<SeatSnapshot>(carContext) 
                 )
             }
         }
+        // No header action: AA hosts allow 0 header actions with custom titles
+        // (ActionsConstraints.validateOrThrow crash killed every session launch).
+        // The 15s auto-poll already covers refresh.
         return ListTemplate.Builder()
             .setTitle("Wolfpack Seat")
-            .setHeaderAction(
-                Action.Builder()
-                    .setTitle("Refresh")
-                    .setOnClickListener { kick() }
-                    .build()
-            )
             .setSingleList(list.build())
             .build()
     }

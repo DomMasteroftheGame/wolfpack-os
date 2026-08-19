@@ -47,7 +47,7 @@ abstract class PollScreen<T>(carContext: CarContext, private val periodMs: Long 
         scope.cancel()
     }
 
-    /** (Re)start polling now — also the handler behind the Refresh header action. */
+    /** (Re)start polling now. */
     fun kick() {
         job?.cancel()
         job = scope.launch {
