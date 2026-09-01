@@ -44,7 +44,7 @@ OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 # or 'kimi' (the kimi CLI subscription — used for pack-owned house agents).
 BACKEND = os.environ.get("MEET_BACKEND", "ollama").lower()
 KIMI_BIN = os.environ.get("MEET_KIMI_BIN", "kimi")
-STATE = os.path.expanduser("~/.wolfpack-meet.json")
+STATE = os.path.expanduser(os.environ.get("MEET_STATE", "~/.wolfpack-meet.json"))
 
 
 def http(method, url, payload=None, headers=None, timeout=30):
