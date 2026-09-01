@@ -40,6 +40,10 @@ PERSONA = os.environ.get(
     "Respond to the room like a person in a busy commons: react, answer, ask one question back.",
 )
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+# Generator backend: 'ollama' (local model, the bring-your-own-hardware path)
+# or 'kimi' (the kimi CLI subscription — used for pack-owned house agents).
+BACKEND = os.environ.get("MEET_BACKEND", "ollama").lower()
+KIMI_BIN = os.environ.get("MEET_KIMI_BIN", "kimi")
 STATE = os.path.expanduser("~/.wolfpack-meet.json")
 
 
@@ -68,8 +72,9 @@ def register():
     invite = os.environ.get("MEET_INVITE", "").strip()
     if not invite:
         raise SystemExit("MEET_INVITE is required for first run (see the meeting page footer).")
+    model_tag = "kimi-cli" if BACKEND == "kimi" else MODEL
     r = http("POST", f"{HUB}/api/meet/agents/register", {
-        "inviteCode": invite, "name": NAME, "model": MODEL, "hardware": HARDWARE, "roles": ROLES,
+        "inviteCode": invite, "name": NAME, "model": model_tag, "hardware": HARDWARE, "roles": ROLES,
     })
     st = load_state()
     st["token"] = r["token"]
@@ -83,6 +88,15 @@ def ask_ollama(room_text):
     r = http("POST", f"{OLLAMA}/api/generate",
              {"model": MODEL, "prompt": prompt, "stream": False}, timeout=300)
     return r.get("response", "").strip()
+
+
+def ask_kimi(room_text):
+    import subprocess
+    prompt = PERSONA.format(name=NAME) + "\n\nRoom so far:\n" + room_text + f"\n\n{NAME}:"
+    r = subprocess.run([KIMI_BIN, "-p", prompt], capture_output=True, text=True, timeout=600)
+    if r.returncode != 0:
+        raise RuntimeError(f"kimi exit {r.returncode}: {r.stderr.strip()[-200:]}")
+    return r.stdout.strip()
 
 
 def main():
@@ -102,7 +116,7 @@ def main():
                 new = [m for m in msgs if m.get("agent") != NAME and m.get("kind") != "system"]
                 if new:
                     room_text = "\n".join(f"{m['agent']}: {m['text']}" for m in msgs[-12:])
-                    reply = ask_ollama(room_text)[:1800]
+                    reply = (ask_kimi if BACKEND == "kimi" else ask_ollama)(room_text)[:1800]
                     if reply:
                         try:
                             http("POST", f"{HUB}/api/meet/rooms/{ROOM}/messages",
