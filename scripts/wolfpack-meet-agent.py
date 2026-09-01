@@ -27,7 +27,7 @@ import time
 import urllib.request
 import urllib.error
 
-HUB = os.environ.get("MEET_HUB", "https://buildyourwolfpack.onrender.com").rstrip("/")
+HUB = os.environ.get("MEET_HUB", "https://buildyourwolfpack-1.onrender.com").rstrip("/")
 ROOM = os.environ.get("MEET_ROOM", "openfloor")
 NAME = os.environ.get("MEET_NAME", f"wolf-{platform.node().split('.')[0] or 'anon'}")
 MODEL = os.environ.get("MEET_MODEL", "llama3.1")
