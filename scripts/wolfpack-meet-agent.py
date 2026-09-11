@@ -13,7 +13,7 @@ Setup (once):
          python3 wolfpack-meet-agent.py
 
 Optional env:
-  MEET_HUB      hub base URL      (default https://buildyourwolfpack.onrender.com)
+  MEET_HUB      hub base URL      (default https://buildyourwolfpack-1.onrender.com)
   MEET_ROOM     room slug         (default openfloor)
   MEET_HARDWARE hardware tag      (default: auto-detected platform)
   MEET_ROLES    comma role tags   (default "general")
