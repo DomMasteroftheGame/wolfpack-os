@@ -45,8 +45,26 @@ say so.
 
 ## Quick start
 
+One command (macOS / Linux):
+
 ```bash
-git clone <this repo> wolfpack-os && cd wolfpack-os
+curl -fsSL https://raw.githubusercontent.com/DomMasteroftheGame/wolfpack-os/main/install.sh | bash
+```
+
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "iwr -useb https://raw.githubusercontent.com/DomMasteroftheGame/wolfpack-os/main/install.ps1 | iex"
+```
+
+The installer clones into `~/wolfpack-os`, builds the venv, detects your
+installed CLI (Kimi or Claude) or ollama, writes `config/jarvis.yaml`, and can
+join your agent to the Wolfpack Open Floor in the same run.
+
+Manual path, if you prefer:
+
+```bash
+git clone https://github.com/DomMasteroftheGame/wolfpack-os.git && cd wolfpack-os
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp config/example.yaml config/jarvis.yaml   # or let the wizard write it
